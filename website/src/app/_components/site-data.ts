@@ -6,6 +6,7 @@ export const routeNavItems = [
   { label: 'Changelog', href: '/changelog' },
   { label: 'Contact', href: '/contact' },
   { label: 'Power-Ups', href: '/power-ups' },
+  { label: 'Chat', href: '/chat' },
 ]
 
 export const socialLinks = [

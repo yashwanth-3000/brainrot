@@ -1,4 +1,5 @@
 .shell {
+  background: radial-gradient(circle at top, rgba(214, 206, 255, 0.5) 0%, rgba(250, 250, 252, 0.6) 22%, #fafafa 40%);
   min-height: 100vh;
   overflow: clip;
   position: relative;
@@ -15,7 +16,7 @@
 }
 
 .shell::before {
-  background: rgba(164, 142, 255, 0.24);
+  background: rgba(140, 115, 255, 0.2);
   height: 18rem;
   left: -3rem;
   top: 7rem;
@@ -23,7 +24,7 @@
 }
 
 .shell::after {
-  background: rgba(255, 213, 154, 0.18);
+  background: rgba(82, 53, 239, 0.1);
   bottom: 10rem;
   height: 14rem;
   right: -2rem;
@@ -116,15 +117,15 @@
 }
 
 .button {
-  background: linear-gradient(180deg, #8a73ff 0%, #5235ef 100%);
-  box-shadow: 0 18px 34px rgba(82, 53, 239, 0.24);
+  background: linear-gradient(135deg, #e07843 0%, #c8743d 55%, #b45e2a 100%);
+  box-shadow: 0 14px 30px rgba(200, 116, 61, 0.28);
   color: white;
   padding: 1rem 1.45rem;
 }
 
 .buttonGhost {
-  background: linear-gradient(180deg, #313136 0%, #101011 100%);
-  box-shadow: 0 14px 30px rgba(16, 16, 17, 0.18);
+  background: linear-gradient(180deg, #2e1c10 0%, #1a0e06 100%);
+  box-shadow: 0 10px 24px rgba(43, 24, 10, 0.22);
   color: white;
   padding: 0.95rem 1.35rem;
 }
@@ -157,7 +158,7 @@
 }
 
 .hero::before {
-  background: radial-gradient(circle at top, rgba(214, 206, 255, 0.6) 0%, rgba(255, 255, 255, 0) 55%);
+  background: radial-gradient(circle at top, rgba(160, 130, 255, 0.55) 0%, rgba(250, 250, 252, 0) 55%);
   content: '';
   inset: 0 auto auto 50%;
   pointer-events: none;
@@ -168,7 +169,7 @@
 }
 
 .eyebrow {
-  color: var(--ink-400);
+  color: #5235ef;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -180,8 +181,8 @@
 .title {
   font-family: var(--font-display);
   font-size: clamp(2.7rem, 5.8vw, 4.55rem);
-  letter-spacing: -0.08em;
-  line-height: 0.92;
+  letter-spacing: -0.03em;
+  line-height: 1.08;
   margin: 0 auto;
   max-width: 14ch;
   position: relative;
@@ -212,8 +213,8 @@
 .sectionTitle {
   font-family: var(--font-display);
   font-size: clamp(1.85rem, 4vw, 2.8rem);
-  letter-spacing: -0.05em;
-  line-height: 1.04;
+  letter-spacing: -0.025em;
+  line-height: 1.12;
   margin: 0;
 }
 
@@ -293,7 +294,7 @@
 }
 
 .panelSoft {
-  background: linear-gradient(180deg, #ffffff 0%, #f7f9fd 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f7f7fd 100%);
 }
 
 .panelDark {
@@ -572,7 +573,7 @@
   font-family: var(--font-display);
   font-size: 2rem;
   font-weight: 700;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.025em;
   position: relative;
   z-index: 1;
 }
@@ -664,7 +665,7 @@
   color: white;
   font-family: var(--font-display);
   font-size: clamp(1.7rem, 4vw, 2.5rem);
-  letter-spacing: -0.05em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 
@@ -779,7 +780,7 @@
   color: var(--ink-900);
   font-family: var(--font-display);
   font-size: 1.65rem;
-  letter-spacing: -0.05em;
+  letter-spacing: -0.025em;
   line-height: 1;
   margin: 0;
 }
@@ -1098,7 +1099,7 @@
   color: white;
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 3vw, 2.3rem);
-  letter-spacing: -0.05em;
+  letter-spacing: -0.025em;
   margin: 0;
 }
 

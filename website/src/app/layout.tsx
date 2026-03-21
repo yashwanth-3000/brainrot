@@ -1,15 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter, Inter_Tight } from 'next/font/google'
+import { DM_Sans, Instrument_Serif } from 'next/font/google'
 import { MotionOrchestrator } from './_components/motion-orchestrator'
 import './globals.css'
 
-const inter = Inter({
+const dmSans = DM_Sans({
   subsets: ['latin'],
   variable: '--font-body',
 })
 
-const interTight = Inter_Tight({
+const instrumentSerif = Instrument_Serif({
   subsets: ['latin'],
+  weight: '400',
+  style: ['normal', 'italic'],
   variable: '--font-display',
 })
 
@@ -28,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" data-motion="ready">
-      <body className={`${inter.variable} ${interTight.variable}`}>
+      <body className={`${dmSans.variable} ${instrumentSerif.variable}`}>
         <MotionOrchestrator />
         {children}
       </body>

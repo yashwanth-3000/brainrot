@@ -1,5 +1,5 @@
 :root {
-  color: #101011;
+  color: #0f0e12;
   font-family: var(--font-body);
   font-synthesis: none;
   font-weight: 400;
@@ -7,17 +7,17 @@
   text-rendering: optimizeLegibility;
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
-  --page-bg: #ffffff;
-  --surface: #f7f8fb;
-  --surface-strong: #eef2f8;
-  --ink-900: #101011;
-  --ink-800: #1d1e20;
-  --ink-700: #2b2b2c;
-  --ink-500: #606266;
-  --ink-400: #92949a;
-  --ink-200: #dfe4ec;
-  --violet-700: #5235ef;
-  --violet-600: #6d5bff;
+  --page-bg: #fafafa;
+  --surface: #ffffff;
+  --surface-strong: #f0eef8;
+  --ink-900: #0f0e12;
+  --ink-800: #1e1b28;
+  --ink-700: #2e2a3a;
+  --ink-500: #5c5870;
+  --ink-400: #9592a0;
+  --ink-200: #dddae8;
+  --violet:    #5235ef;
+  --violet-hi: #6d5bff;
 
   background: var(--page-bg);
 }
@@ -39,8 +39,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at top, rgba(210, 201, 255, 0.65) 0%, rgba(244, 246, 251, 0.55) 18%, rgba(255, 255, 255, 1) 36%);
+  background: #ffffff;
   margin: 0;
   min-width: 320px;
 }

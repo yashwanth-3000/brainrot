@@ -1,8 +1,9 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import Navbar from '@/components/ui/navbar'
 import styles from './marketing-page.module.css'
-import { footerColumns, routeNavItems, siteLogo, socialLinks } from './site-data'
+import { footerColumns, siteLogo, socialLinks } from './site-data'
 
 type MarketingShellProps = {
   eyebrow: string
@@ -14,23 +15,7 @@ type MarketingShellProps = {
 export function MarketingShell({ eyebrow, title, description, children }: MarketingShellProps) {
   return (
     <div className={styles.shell}>
-      <header className={styles.header} data-reveal data-reveal-delay="40ms" data-reveal-y="12px">
-        <Link className={styles.brand} href="/" aria-label="Draftr home">
-          <img src={siteLogo} alt="Draftr" />
-        </Link>
-
-        <nav className={styles.nav} aria-label="Primary navigation">
-          {routeNavItems.map((item) => (
-            <Link key={item.label} href={item.href} className={styles.navLink}>
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-
-        <Link className={styles.buttonGhost} href="/contact">
-          Login now
-        </Link>
-      </header>
+      <Navbar />
 
       <main>
         <section className={styles.hero} data-reveal data-reveal-delay="90ms">
