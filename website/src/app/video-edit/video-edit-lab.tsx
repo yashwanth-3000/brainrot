@@ -209,6 +209,11 @@ export function VideoEditLab() {
       const response = await fetch(`/api/brainrot/batches/${batchId}`, { cache: "no-store" });
       const payload = await response.json();
       if (!response.ok) {
+        if (response.status === 404 && activeBatchId === batchId) {
+          eventSourceRef.current?.close();
+          setActiveBatchId(null);
+          setConnectionState("idle");
+        }
         throw new Error(payload?.detail ?? "Failed to refresh preview batch.");
       }
       setBatchEnvelope(payload);

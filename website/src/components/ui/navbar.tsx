@@ -7,8 +7,8 @@ import { Github, Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
   { label: "Chat", href: "/chat" },
+  { label: "Shorts", href: "/shorts" },
   { label: "About", href: "/about" },
-  { label: "Blog", href: "/blog" },
 ] as const;
 
 type NavbarProps = {

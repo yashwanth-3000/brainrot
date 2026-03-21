@@ -2582,3 +2582,333 @@
 
 .typingDot:nth-child(2) { animation-delay: 0.18s; }
 .typingDot:nth-child(3) { animation-delay: 0.36s; }
+
+/* ── AI bubble stack wider ─────────────────────────────────────────── */
+.bubbleStackAi {
+  max-width: 92%;
+  width: 100%;
+}
+
+/* ── Generated video card ──────────────────────────────────────────── */
+.genCard {
+  background: rgba(255,255,255,0.96);
+  border: 1px solid #e0dde8;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(82,53,239,0.07), 0 1px 3px rgba(0,0,0,0.04);
+  width: 100%;
+  max-width: 520px;
+}
+
+.genCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #f0edf8;
+}
+
+.genCardHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.genCardAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.genCardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a1825;
+  margin: 0 0 1px;
+  letter-spacing: -0.02em;
+}
+
+.genCardSub {
+  font-size: 11px;
+  color: #9e9ab8;
+  margin: 0;
+}
+
+.genCardTag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+/* Video preview block */
+.genPreview {
+  position: relative;
+  height: 220px;
+  overflow: hidden;
+}
+
+.vidBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.vidGrid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  width: 100%;
+  height: 100%;
+  gap: 1px;
+}
+
+.vidCell {
+  animation: vidPulse 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes vidPulse {
+  from { opacity: 0.5; }
+  to { opacity: 0.9; }
+}
+
+.vidScanline {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(0,0,0,0.15) 3px,
+    rgba(0,0,0,0.15) 4px
+  );
+}
+
+.vidBgLabel {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.genOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(to bottom, rgba(8,6,15,0.45) 0%, rgba(8,6,15,0.05) 30%, rgba(8,6,15,0.05) 60%, rgba(8,6,15,0.6) 100%);
+}
+
+.genSource {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(12,10,22,0.68);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+
+.genSourceText {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.genFactWrap {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 12px 50px;
+}
+
+.genFact {
+  position: absolute;
+  inset: 40px 12px 50px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(12,10,22,0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  padding: 14px;
+  opacity: 0;
+  transform: translateY(8px) scale(0.97);
+  transition: opacity 0.38s ease, transform 0.38s ease;
+  pointer-events: none;
+}
+
+.genFactActive {
+  opacity: 1;
+  transform: none;
+  position: relative;
+  inset: auto;
+  pointer-events: auto;
+}
+
+.genFactText {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: #e8e4ff;
+  margin: 0;
+  font-weight: 400;
+}
+
+.genFactDots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.genFactDot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.22);
+  transition: background 0.3s, width 0.3s;
+}
+
+.genFactDotActive {
+  width: 14px;
+  border-radius: 2px;
+}
+
+.genProgress {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  height: 2px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px;
+  z-index: 6;
+  overflow: hidden;
+}
+
+.genProgressFill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 3s linear;
+}
+
+.genPlayBtn {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  z-index: 6;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.genStats {
+  position: absolute;
+  bottom: 18px;
+  right: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+}
+
+/* Actions row */
+.genActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid #f0edf8;
+}
+
+.genActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border: 1px solid #e0dde8;
+  background: rgba(248,247,255,0.9);
+  color: #5c5870;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+}
+
+.genActionBtn:hover {
+  background: #ede8ff;
+  border-color: #c4b5fd;
+  color: #3b1fcc;
+}
+
+.genActionBtnLiked {
+  color: #ef4444;
+  border-color: #fca5a5;
+  background: #fff5f5;
+}
+
+.genActionBtnPrimary {
+  color: #fff !important;
+  box-shadow: 0 3px 12px rgba(82,53,239,0.3);
+}
+
+.genActionBtnPrimary:hover {
+  opacity: 0.9;
+  color: #fff !important;
+}
+
+/* Nudge */
+.genNudge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 16px 10px;
+  font-size: 11px;
+  color: #9e9ab8;
+  letter-spacing: -0.01em;
+  border-top: 1px solid #f0edf8;
+}
