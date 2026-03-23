@@ -66,6 +66,10 @@ type GeneratedShort = {
   itemId: string
   videoUrl: string
   updatedAt: string
+  estimatedSeconds: number | null
+  subtitleStyle: string | null
+  subtitleFont: string | null
+  gameplayAsset: string | null
 }
 
 // ─── Page root ───────────────────────────────────────────────────────────────
@@ -272,14 +276,12 @@ function ShortsShell({
               >
                 <ChatListCover chat={chat} />
                 <div className={styles.chatListBody}>
-                  <div className={styles.chatListMeta}>
-                    <p className={styles.chatListTitle}>{chat.title}</p>
-                    <span className={styles.chatListTime}>{formatRelTime(chat.updated_at)}</span>
-                  </div>
+                  <p className={styles.chatListTitle}>{chat.title}</p>
                   <p className={styles.chatListSource}>{chat.last_source_label ?? chat.last_source_url ?? 'Untitled source'}</p>
                   <div className={styles.chatListStats}>
                     <span>{formatExportSummary(chat)}</span>
                     <span>{chat.total_runs} run{chat.total_runs === 1 ? '' : 's'}</span>
+                    <span className={styles.chatListTime}>{formatRelTime(chat.updated_at)}</span>
                   </div>
                 </div>
               </button>
@@ -293,18 +295,16 @@ function ShortsShell({
           <div className={styles.mainNavSpacer} />
           {/* Slim context bar */}
           <div className={styles.chatBar}>
-            <div className={styles.chatBarLeft}>
+            <div className={styles.chatBarSpacer} />
+            <div className={styles.chatBarCenter}>
               <h2 className={styles.chatBarTitle}>{selectedChat?.title ?? 'Select a chat'}</h2>
-              {selectedChat?.last_source_label && (
-                <span className={styles.chatBarSource}>{selectedChat.last_source_label}</span>
-              )}
             </div>
-            {selectedChat && exportSummary && (
+            {selectedChat && exportSummary ? (
               <div className={styles.chatBarRight}>
                 <span className={styles.chatBarBadge}>{exportSummary}</span>
                 {updatedTime && <span className={styles.chatBarTime}>{updatedTime}</span>}
               </div>
-            )}
+            ) : <div className={styles.chatBarSpacer} />}
           </div>
 
           {/* Feed canvas */}
@@ -368,6 +368,8 @@ function ShortsShell({
 function ShortsFeed({ shorts }: { shorts: GeneratedShort[] }) {
   const feedRef = useRef<HTMLDivElement>(null)
   const [activeIndex, setActiveIndex] = useState(0)
+  // Shared mute state across all slides — once user unmutes, all subsequent slides stay unmuted
+  const [globalMuted, setGlobalMuted] = useState(false)
   const isScrolling = useRef(false)
   const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -434,6 +436,8 @@ function ShortsFeed({ shorts }: { shorts: GeneratedShort[] }) {
             total={shorts.length}
             isActive={index === activeIndex}
             shouldPrime={Math.abs(index - activeIndex) <= 1}
+            globalMuted={globalMuted}
+            onMuteChange={setGlobalMuted}
           />
         </div>
       ))}
@@ -444,32 +448,46 @@ function ShortsFeed({ shorts }: { shorts: GeneratedShort[] }) {
 // ─── Individual short card ────────────────────────────────────────────────────
 
 function ShortSlide({
-  short, index, total, isActive, shouldPrime,
+  short, index, total, isActive, shouldPrime, globalMuted, onMuteChange,
 }: {
   short: GeneratedShort
   index: number
   total: number
   isActive: boolean
   shouldPrime: boolean
+  globalMuted: boolean
+  onMuteChange: (muted: boolean) => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [isMuted, setIsMuted] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [isBuffering, setIsBuffering] = useState(true)
   const [hasLoadedFrame, setHasLoadedFrame] = useState(false)
+  const [animateIn, setAnimateIn] = useState(false)
+  const [showInfo, setShowInfo] = useState(false)
 
   useEffect(() => {
     setIsBuffering(shouldPrime)
     setHasLoadedFrame(false)
   }, [short.videoUrl, shouldPrime])
 
-  // Ensure video starts unmuted. Remove the muted HTML attribute so browsers
-  // don't treat it as a muted-autoplay request. We explicitly set muted=false.
+  // Replay entrance animations each time this slide becomes active
+  useEffect(() => {
+    if (isActive) {
+      setAnimateIn(false)
+      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setAnimateIn(true)))
+      return () => cancelAnimationFrame(raf)
+    } else {
+      setAnimateIn(false)
+    }
+  }, [isActive])
+
+  // Remove the muted HTML attribute so browsers don't treat it as a muted-autoplay request
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
     v.removeAttribute('muted')
-    v.muted = false
+    v.muted = globalMuted
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -481,24 +499,31 @@ function ShortSlide({
     }
   }, [isActive, shouldPrime, short.videoUrl])
 
+  // Sync video mute state whenever globalMuted changes
+  useEffect(() => {
+    const v = videoRef.current
+    if (!v) return
+    v.muted = globalMuted
+  }, [globalMuted])
+
   // Play/pause + restart when this card becomes active
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
     if (isActive) {
-      v.currentTime = 0    // always restart from the beginning
-      v.muted = false      // always unmute on entry
-      setIsMuted(false)
-      // Try unmuted play; if browser blocks it, fall back to muted play
+      v.currentTime = 0
+      v.muted = globalMuted
+      // Try play; if browser blocks unmuted, fall back to muted but keep globalMuted in sync
       v.play().catch(() => {
         v.muted = true
-        setIsMuted(true)
+        onMuteChange(true)
         v.play().catch(() => {})
       })
       setIsPaused(false)
     } else {
       v.pause()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive])
 
   function handleCardClick() {
@@ -512,14 +537,15 @@ function ShortSlide({
     e.stopPropagation()
     const v = videoRef.current
     if (!v) return
-    v.muted = !v.muted
-    setIsMuted(v.muted)
+    const next = !v.muted
+    v.muted = next
+    onMuteChange(next)
   }
 
   return (
     <div className={styles.shortRow}>
       {/* ── 9:16 video card ── */}
-      <article className={styles.shortCard} onClick={handleCardClick}>
+      <article className={`${styles.shortCard} ${isActive ? styles.shortCardActive : ''}`} onClick={handleCardClick}>
         <video
           ref={videoRef}
           className={`${styles.shortVideo} ${hasLoadedFrame ? styles.shortVideoReady : ''}`}
@@ -568,15 +594,15 @@ function ShortSlide({
         )}
 
         {/* Top-right: counter + mute button */}
-        <div className={styles.shortTopControls}>
+        <div className={`${styles.shortTopControls} ${animateIn ? styles.shortTopControlsAnimate : ''}`}>
           <span className={styles.shortCounter}>{index + 1} / {total}</span>
           <button
             type="button"
             className={styles.shortMuteBtn}
             onClick={toggleMute}
-            aria-label={isMuted ? 'Unmute' : 'Mute'}
+            aria-label={globalMuted ? 'Unmute' : 'Mute'}
           >
-            {isMuted ? (
+            {globalMuted ? (
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
                 <line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" />
@@ -591,8 +617,44 @@ function ShortSlide({
           </button>
         </div>
 
+        {/* Info panel */}
+        {showInfo && (
+          <div className={styles.shortInfoPanel} onClick={e => e.stopPropagation()}>
+            <div className={styles.shortInfoPanelHeader}>
+              <span className={styles.shortInfoPanelTitle}>About this short</span>
+              <button type="button" className={styles.shortInfoPanelClose} onClick={() => setShowInfo(false)}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className={styles.shortInfoPanelRows}>
+              <InfoRow label="Title" value={short.title} />
+              {short.source && <InfoRow label="Source label" value={short.source} />}
+              {short.sourceUrl && short.sourceUrl !== '#' && (
+                <InfoRow label="Source URL" value={short.sourceUrl} href={short.sourceUrl} />
+              )}
+              {short.estimatedSeconds != null && (
+                <InfoRow label="Duration" value={`~${Math.round(short.estimatedSeconds)}s`} />
+              )}
+              {short.subtitleStyle && (
+                <InfoRow label="Subtitle style" value={short.subtitleStyle} />
+              )}
+              {short.subtitleFont && (
+                <InfoRow label="Font" value={short.subtitleFont} />
+              )}
+              {short.gameplayAsset && (
+                <InfoRow label="Gameplay" value={short.gameplayAsset.split('/').pop()?.replace(/[-_]/g, ' ') ?? short.gameplayAsset} />
+              )}
+              <InfoRow label="Generated" value={formatRelTime(short.updatedAt)} />
+              <InfoRow label="Batch ID" value={short.batchId} mono />
+              <InfoRow label="Item ID" value={short.itemId} mono />
+            </div>
+          </div>
+        )}
+
         {/* Bottom info overlay */}
-        <div className={styles.shortInfo}>
+        <div className={`${styles.shortInfo} ${animateIn ? styles.shortInfoAnimate : ''}`}>
           <div className={styles.shortAuthorRow}>
             <div className={styles.shortAvatar}>D</div>
             <div className={styles.shortAuthorText}>
@@ -605,7 +667,7 @@ function ShortSlide({
       </article>
 
       {/* ── Right action column ── */}
-      <div className={styles.shortActions}>
+      <div className={`${styles.shortActions} ${animateIn ? styles.shortActionsAnimate : ''}`}>
         <button type="button" className={styles.shortActionBtn} aria-label="Like">
           <div className={styles.shortActionIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -625,17 +687,30 @@ function ShortSlide({
           <span className={styles.shortActionLabel}>Open</span>
         </a>
 
-        <button type="button" className={styles.shortActionBtn} aria-label="Share">
-          <div className={styles.shortActionIcon}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+        <button type="button" className={styles.shortActionBtn} aria-label="Info" onClick={(e) => { e.stopPropagation(); setShowInfo(v => !v) }}>
+          <div className={`${styles.shortActionIcon} ${showInfo ? styles.shortActionIconActive : ''}`}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="8.5" strokeWidth="3" strokeLinecap="round" />
+              <line x1="12" y1="12" x2="12" y2="17" />
             </svg>
           </div>
-          <span className={styles.shortActionLabel}>Share</span>
+          <span className={styles.shortActionLabel}>Info</span>
         </button>
       </div>
+    </div>
+  )
+}
+
+function InfoRow({ label, value, href, mono }: { label: string; value: string; href?: string; mono?: boolean }) {
+  return (
+    <div className={styles.infoRow}>
+      <span className={styles.infoRowLabel}>{label}</span>
+      {href ? (
+        <a href={href} target="_blank" rel="noreferrer" className={`${styles.infoRowValue} ${styles.infoRowLink}`}>{value}</a>
+      ) : (
+        <span className={`${styles.infoRowValue} ${mono ? styles.infoRowMono : ''}`}>{value}</span>
+      )}
     </div>
   )
 }
@@ -674,7 +749,7 @@ function ChatListCover({ chat }: { chat: ChatSummary }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapStoredToShort(s: StoredChatShort): GeneratedShort {
-  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: s.previewUrl, updatedAt: s.createdAt }
+  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: s.previewUrl, updatedAt: s.createdAt, estimatedSeconds: null, subtitleStyle: null, subtitleFont: null, gameplayAsset: null }
 }
 
 function mapAssetToShort(a: ChatGeneratedAsset): GeneratedShort {
@@ -691,6 +766,10 @@ function mapAssetToShort(a: ChatGeneratedAsset): GeneratedShort {
     batchId: a.batch_id, itemId: a.item_id,
     videoUrl: directVideoUrl,
     updatedAt: a.updated_at,
+    estimatedSeconds: a.script?.estimated_seconds ?? null,
+    subtitleStyle: a.render_metadata?.subtitle_style_label ?? null,
+    subtitleFont: a.render_metadata?.subtitle_font_name ?? null,
+    gameplayAsset: a.render_metadata?.gameplay_asset_path ?? null,
   }
 }
 
