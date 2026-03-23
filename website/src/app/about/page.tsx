@@ -23,7 +23,7 @@ export default function AboutPage() {
   return (
     <MarketingShell
       eyebrow="About"
-      title="Design isn’t just what we do — it’s how we think."
+      title="Design isn’t just what we do, it’s how we think."
       description="At Draftr, we’re building the next generation of design tools: simple, collaborative, and lightning fast. Our goal is to help teams move from idea to execution without friction."
     >
       <PageSection>
@@ -49,7 +49,7 @@ export default function AboutPage() {
       <PageSection>
         <SectionHeader
           title="From Idea to Impact"
-          intro="At Draftr, we’re building the next generation of design tools — simple, collaborative, and lightning fast. Our mission is to empower teams to move from idea to execution without friction."
+          intro="At Draftr, we’re building the next generation of design tools: simple, collaborative, and lightning fast. Our mission is to empower teams to move from idea to execution without friction."
         />
 
         <div className={styles.aboutCopy}>

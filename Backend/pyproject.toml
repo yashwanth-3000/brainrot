@@ -1,0 +1,38 @@
+[project]
+name = "brainrot-backend"
+version = "0.1.0"
+description = "Backend service for generating short-form brainrot gameplay reels from URLs and PDFs."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "anyio>=4.8.0",
+  "certifi>=2024.2.2",
+  "elevenlabs>=2.39.0",
+  "fastapi>=0.133.0",
+  "httpx>=0.28.1",
+  "openai>=2.8.0",
+  "pdfplumber>=0.11.7",
+  "pydantic-settings>=2.7.1",
+  "python-multipart>=0.0.20",
+  "sse-starlette>=3.3.2",
+  "supabase>=2.28.0",
+  "uvicorn[standard]>=0.34.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.3.5",
+]
+
+[project.scripts]
+brainrot-backend = "brainrot_backend.__main__:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.uv]
+package = true
+
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"

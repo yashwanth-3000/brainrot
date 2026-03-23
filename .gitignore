@@ -1,2 +1,77 @@
+# OS and editor noise
 .DS_Store
 **/.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+.idea/
+.vscode/
+.claude/
+.cursor/
+.codex-*.png
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+!.env*.example
+Backend/.env
+Backend/.env.*
+!Backend/.env.example
+website/.env
+website/.env.*
+!website/.env.example
+
+# Python and backend caches
+**/__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+.python-version
+.uv-cache/
+Backend/.uv-cache/
+Backend/.venv/
+
+# Node, Next.js, and frontend build output
+node_modules/
+website/node_modules/
+.next/
+website/.next/
+out/
+website/out/
+output/
+website/output/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Supabase local state
+Backend/supabase/.branches/
+Backend/supabase/.temp/
+Backend/supabase/.env.keys
+Backend/supabase/.env.local
+Backend/supabase/.env.*.local
+
+# Generated media, uploaded content, and large local assets
+/assets/
+/data/
+/tmp/
+Backend/data/
+
+# Optional local archive or export directories
+dist/
+*.sqlite
+*.db

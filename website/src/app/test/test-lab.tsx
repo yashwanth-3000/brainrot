@@ -899,7 +899,7 @@ export function TestLab() {
 
           <div className={styles.systemGrid}>
             <MiniMetric label="Connection" value={humanizeConnectionState(connectionState)} tone={connectionState === "streaming" || connectionState === "settled" ? "success" : connectionState === "reconnecting" ? "warning" : "neutral"} />
-            <MiniMetric label="Last sync" value={lastSyncedAt ? formatClock(lastSyncedAt) : "—"} tone="neutral" />
+            <MiniMetric label="Last sync" value={lastSyncedAt ? formatClock(lastSyncedAt) : "Not synced yet"} tone="neutral" />
             <MiniMetric label="Producer mode" value={stringValue(producerMetrics?.mode) ?? "direct_openai"} tone="accent" />
             <MiniMetric label="Repairs" value={String(numberValue(producerMetrics?.repair_count) ?? 0)} tone="neutral" />
           </div>

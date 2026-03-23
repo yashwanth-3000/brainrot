@@ -137,7 +137,7 @@
   background: transparent;
 }
 
-/* spinning arc — animates only the gradient angle, never the element */
+/* spinning arc - animates only the gradient angle, never the element */
 @property --btn-angle {
   syntax: '<angle>';
   initial-value: 0deg;
@@ -218,7 +218,7 @@
 
 /* ── Split layout ────────────────────────────────────────────────── */
 .splitRoot {
-  /* flex row — handled inline; this class is a hook for future overrides */
+  /* flex row - handled inline; this class is a hook for future overrides */
 }
 
 /* ── About panel ─────────────────────────────────────────────────── */
@@ -278,6 +278,63 @@
   font-weight: 400;
   color: #5c5870;
   text-align: center;
+}
+
+.batchCountAccessory {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #e0dde8;
+  background: rgba(248, 247, 255, 0.9);
+}
+
+.batchCountAccessoryLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6a6580;
+}
+
+.batchCountAccessoryFieldWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batchCountAccessoryField {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #d9d2ea;
+  background: #ffffff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #171422;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.batchCountAccessoryField:focus {
+  border-color: #8a73ff;
+  box-shadow: 0 0 0 4px rgba(138, 115, 255, 0.12);
+  background: #fff;
+}
+
+.batchCountAccessoryField:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.batchCountAccessoryHint {
+  font-size: 11px;
+  color: #7a7590;
+  letter-spacing: -0.01em;
 }
 
 /* ── Suggestion chips ────────────────────────────────────────────── */
@@ -427,7 +484,7 @@
   margin-right: 2px;
 }
 
-/* Story result — full width so the book can breathe */
+/* Story result - full width so the book can breathe */
 .bubbleStackStory {
   max-width: 100%;
   width: 100%;
@@ -454,7 +511,7 @@
   padding-top: 2px;
 }
 
-/* Regenerate — dark, distinctive, with spinning icon */
+/* Regenerate - dark, distinctive, with spinning icon */
 .storyResultRegenerateBtn {
   display: inline-flex;
   align-items: center;
@@ -1024,7 +1081,7 @@
   padding-top: 2px;
 }
 
-/* Header row — clickable toggle */
+/* Header row - clickable toggle */
 .referenceHeaderRow {
   display: flex;
   align-items: center;
@@ -1077,7 +1134,7 @@
   flex-shrink: 0;
 }
 
-/* Compact source strip — plain text links, no borders */
+/* Compact source strip - plain text links, no borders */
 .referenceStrip {
   display: flex;
   align-items: center;
@@ -1164,7 +1221,7 @@
   white-space: nowrap;
 }
 
-/* Expanded list — single unified container, rows not blocks */
+/* Expanded list - single unified container, rows not blocks */
 .referenceList {
   display: flex;
   flex-direction: column;
@@ -1426,7 +1483,7 @@
   overflow: visible;
 }
 
-/* Timeline step — matches thoughtLog styles exactly */
+/* Timeline step - matches thoughtLog styles exactly */
 .thinkingStep {
   display: flex;
   align-items: stretch;
@@ -1558,7 +1615,7 @@
   gap: 6px;
 }
 
-/* Carousel wrapper — flex row: [arrow] [scrollable cards] [arrow] */
+/* Carousel wrapper - flex row: [arrow] [scrollable cards] [arrow] */
 .thinkingCarouselWrapper {
   margin-top: 10px;
   display: flex;
@@ -1650,7 +1707,7 @@
   transition: border-color 0.14s ease;
 }
 
-/* Hover only fires when the card is NOT selected — avoids the border-color fight */
+/* Hover only fires when the card is NOT selected - avoids the border-color fight */
 .thinkingCharacterCard:hover:not(:disabled):not([data-active]) {
   border-color: #7c6aff;
 }
@@ -1778,7 +1835,7 @@
 
 .thinkingCharacterCardActive {
   border-color: #5235ef;
-  /* inset shadow stays inside the card — never clipped by parent overflow */
+  /* inset shadow stays inside the card - never clipped by parent overflow */
   box-shadow: inset 0 0 0 2px rgba(192, 112, 56, 0.55);
 }
 
@@ -2383,6 +2440,502 @@
   margin-top: 8px;
 }
 
+/* Live batch trace + results */
+.liveBatchWrap {
+  width: 100%;
+}
+
+.liveTracePanel {
+  border: 1px solid #e0dde8;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 24px rgba(82, 53, 239, 0.06);
+  padding: 14px 16px;
+}
+
+.liveTraceSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.liveTraceSummaryTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.liveTraceStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.liveTraceStatusDot-accent {
+  background: #8a73ff;
+}
+
+.liveTraceStatusDot-success {
+  background: #2db97c;
+}
+
+.liveTraceStatusDot-warning {
+  background: #d98b22;
+}
+
+.liveTraceStatusDot-danger {
+  background: #d55353;
+}
+
+.liveTraceStatusDot-neutral {
+  background: #b0a9c4;
+}
+
+.liveTraceProviderBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.liveTraceProviderBadge-accent {
+  background: rgba(109, 91, 255, 0.08);
+  border-color: rgba(109, 91, 255, 0.18);
+  color: #6d5bff;
+}
+
+.liveTraceProviderBadge-success {
+  background: rgba(45, 185, 124, 0.1);
+  border-color: rgba(45, 185, 124, 0.18);
+  color: #20865a;
+}
+
+.liveTraceProviderBadge-warning {
+  background: rgba(217, 139, 34, 0.1);
+  border-color: rgba(217, 139, 34, 0.18);
+  color: #9c6212;
+}
+
+.liveTraceProviderBadge-danger {
+  background: rgba(213, 83, 83, 0.1);
+  border-color: rgba(213, 83, 83, 0.18);
+  color: #aa3333;
+}
+
+.liveTraceProviderBadge-neutral {
+  background: rgba(176, 169, 196, 0.12);
+  border-color: rgba(176, 169, 196, 0.22);
+  color: #6a647c;
+}
+
+.liveTraceProviderIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.liveTraceProviderIcon-accent {
+  color: #6d5bff;
+}
+
+.liveTraceProviderIcon-success {
+  color: #20865a;
+}
+
+.liveTraceProviderIcon-warning {
+  color: #9c6212;
+}
+
+.liveTraceProviderIcon-danger {
+  color: #aa3333;
+}
+
+.liveTraceProviderIcon-neutral {
+  color: #6a647c;
+}
+
+.liveTraceTime {
+  font-size: 11px;
+  color: #7f7892;
+  letter-spacing: -0.01em;
+}
+
+.liveTraceTitle {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+  color: #171521;
+  font-weight: 600;
+}
+
+.liveTraceDetail {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #625d74;
+}
+
+.liveTraceBody {
+  margin-top: 14px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.liveTraceBody::-webkit-scrollbar {
+  width: 8px;
+}
+
+.liveTraceBody::-webkit-scrollbar-thumb {
+  background: rgba(132, 120, 173, 0.3);
+  border-radius: 999px;
+}
+
+.liveTraceEntryProviderRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px;
+}
+
+.liveTraceEntryProvider {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a83a0;
+}
+
+.liveTraceEmptyState {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  border: 1px dashed #ddd8eb;
+  background: #faf9ff;
+  padding: 12px 13px;
+  color: #68627b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.liveTraceEmptyState p {
+  margin: 0;
+}
+
+.liveTraceEmptyIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(109, 91, 255, 0.09);
+  color: #6d5bff;
+  flex-shrink: 0;
+}
+
+.thoughtLogBullet-accent {
+  background: #9e8bff;
+}
+
+.thoughtLogBullet-success {
+  background: #2db97c;
+}
+
+.thoughtLogBullet-warning {
+  background: #d98b22;
+}
+
+.thoughtLogBullet-danger {
+  background: #d55353;
+}
+
+.thoughtLogBullet-neutral {
+  background: #b0a9c4;
+}
+
+.chatBatchCard {
+  margin-top: 14px;
+  border: 1px solid #e0dde8;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 24px rgba(82, 53, 239, 0.06);
+  overflow: hidden;
+}
+
+.chatBatchHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid #f0edf8;
+}
+
+.chatBatchHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.chatBatchAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(140deg, #b8abff 0%, #7c6aff 55%, #5235ef 100%);
+  color: #f3efff;
+  flex-shrink: 0;
+}
+
+.chatBatchHeaderTitle {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #171521;
+}
+
+.chatBatchHeaderSub {
+  margin: 0;
+  font-size: 11px;
+  color: #918ba6;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.chatBatchStatusBadge,
+.chatBatchItemStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.chatBatchStatusBadge-accent,
+.chatBatchItemStatus-accent {
+  background: rgba(109, 91, 255, 0.08);
+  border-color: rgba(109, 91, 255, 0.18);
+  color: #6d5bff;
+}
+
+.chatBatchStatusBadge-success,
+.chatBatchItemStatus-success {
+  background: rgba(45, 185, 124, 0.1);
+  border-color: rgba(45, 185, 124, 0.18);
+  color: #20865a;
+}
+
+.chatBatchStatusBadge-warning,
+.chatBatchItemStatus-warning {
+  background: rgba(217, 139, 34, 0.1);
+  border-color: rgba(217, 139, 34, 0.18);
+  color: #9c6212;
+}
+
+.chatBatchStatusBadge-danger,
+.chatBatchItemStatus-danger {
+  background: rgba(213, 83, 83, 0.1);
+  border-color: rgba(213, 83, 83, 0.18);
+  color: #aa3333;
+}
+
+.chatBatchStatusBadge-neutral,
+.chatBatchItemStatus-neutral {
+  background: rgba(176, 169, 196, 0.12);
+  border-color: rgba(176, 169, 196, 0.22);
+  color: #6a647c;
+}
+
+.chatBatchMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px 12px;
+  font-size: 11px;
+  color: #78728d;
+  letter-spacing: -0.01em;
+}
+
+.chatBatchActionRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 16px 14px;
+}
+
+.chatBatchPrimaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #6d5bff 0%, #5235ef 100%);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  box-shadow: 0 8px 18px rgba(82, 53, 239, 0.22);
+  cursor: pointer;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
+}
+
+.chatBatchPrimaryButton:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(82, 53, 239, 0.26);
+}
+
+.chatBatchPrimaryButton:active {
+  transform: translateY(0);
+}
+
+.chatBatchCarousel {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 0 16px 16px;
+  scrollbar-width: none;
+}
+
+.chatBatchCarousel::-webkit-scrollbar {
+  display: none;
+}
+
+.chatBatchItemCard {
+  flex: 0 0 248px;
+  width: 248px;
+  border: 1px solid #ece8f6;
+  border-radius: 16px;
+  background: #fcfbff;
+  overflow: hidden;
+}
+
+.chatBatchItemHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 12px 10px;
+}
+
+.chatBatchItemKicker {
+  margin: 0 0 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a83a0;
+}
+
+.chatBatchItemTitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  color: #1a1825;
+  letter-spacing: -0.02em;
+}
+
+.chatBatchVideo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  background: #0f0e12;
+}
+
+.chatBatchVideoPlaceholder {
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
+  color: #7d7790;
+  font-size: 12px;
+  line-height: 1.55;
+  background: linear-gradient(180deg, #f8f6ff 0%, #f0edf8 100%);
+}
+
+.chatBatchVideoPlaceholder span {
+  max-width: 180px;
+}
+
+.chatBatchItemMeta {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-top: 1px solid #f0edf8;
+  font-size: 11px;
+  color: #6a647c;
+  line-height: 1.45;
+}
+
+.chatBatchItemFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 12px;
+  font-size: 11px;
+  color: #7d7790;
+}
+
+.chatBatchItemFooter a {
+  color: #5235ef;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.chatBatchItemFooter a:hover {
+  text-decoration: underline;
+}
+
+.chatBatchItemError {
+  margin: 0;
+  padding: 0 12px 12px;
+  color: #aa3333;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.chatBatchPlaceholder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 16px;
+  color: #6a647c;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.chatBatchPlaceholder p {
+  margin: 0;
+}
+
 @keyframes thinking-spin {
   to { transform: rotate(360deg); }
 }
@@ -2450,17 +3003,32 @@
 }
 
 @media (max-width: 980px) {
+  .batchCountAccessory {
+    width: 100%;
+    justify-content: space-between;
+  }
+
   .thinkingGameplayGrid {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
-  /* keep image grids at 5 cols — chat panel is already max 530px so images stay compact */
+  /* keep image grids at 5 cols - chat panel is already max 530px so images stay compact */
   .thinkingCharacterGrid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
+  .liveTracePanel,
+  .chatBatchCard {
+    border-radius: 16px;
+  }
+
+  .chatBatchItemCard {
+    flex-basis: 220px;
+    width: 220px;
+  }
+
   .thinkingGameplayGrid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -2477,6 +3045,17 @@
 }
 
 @media (max-width: 540px) {
+  .chatBatchHeader,
+  .chatBatchMetaRow {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chatBatchItemCard {
+    flex-basis: min(78vw, 240px);
+    width: min(78vw, 240px);
+  }
+
   .thinkingGameplayGrid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }

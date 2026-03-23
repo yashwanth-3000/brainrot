@@ -12,21 +12,21 @@ const features = [
   {
     tag: 'Drop a URL',
     headline: 'Any blog, article, or paper. Instant video.',
-    body: 'Paste a link to any webpage — a research paper, a Medium post, a news article. Draftr scrapes it, extracts the knowledge, and turns it into a brainrot-format short your brain devours in minutes.',
+    body: 'Paste a link to any webpage, whether it is a research paper, a Medium post, or a news article. Draftr scrapes it, extracts the knowledge, and turns it into a brainrot-format short your brain devours in minutes.',
     accent: '#5235ef',
     icon: '🔗',
   },
   {
     tag: 'Upload your notes',
     headline: 'PDFs and docs, reimagined as content.',
-    body: 'Your textbooks, lecture slides, study guides — upload them and watch Draftr transform dense material into scroll-stopping short-form video. Studying has never felt this illegal.',
+    body: 'Your textbooks, lecture slides, and study guides can be uploaded and turned into scroll-stopping short-form video. Studying has never felt this illegal.',
     accent: '#7c3aed',
     icon: '📄',
   },
   {
     tag: 'Raw content',
     headline: 'Paste anything. Get a video back.',
-    body: 'No file? No problem. Paste your raw notes, a chapter summary, a job description, a recipe — anything. Draftr shapes it into the exact format your brain already knows how to binge.',
+    body: 'No file? No problem. Paste your raw notes, a chapter summary, a job description, or a recipe. Draftr shapes it into the exact format your brain already knows how to binge.',
     accent: '#6d28d9',
     icon: '✍️',
   },
@@ -36,7 +36,7 @@ const steps = [
   {
     n: '01',
     title: 'Drop your content',
-    body: 'Paste a URL, upload a PDF, or dump raw text. Your study notes, a blog you bookmarked, a paper you\'ve been avoiding — anything works.',
+    body: 'Paste a URL, upload a PDF, or dump raw text. Your study notes, a blog you bookmarked, or a paper you\'ve been avoiding all work.',
   },
   {
     n: '02',
@@ -46,7 +46,7 @@ const steps = [
   {
     n: '03',
     title: 'Brainrot video, generated',
-    body: 'A video drops — gameplay background, your content layered on top, narrated in the same dopamine-triggering format you\'ve been watching for hours anyway.',
+    body: 'A video drops with a gameplay background, your content layered on top, and narration in the same dopamine-triggering format you\'ve been watching for hours anyway.',
   },
 ]
 
@@ -105,7 +105,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Phone mockup — brainrot video preview */}
+        {/* Phone mockup - brainrot video preview */}
         <div className="hp-hero__visual" aria-hidden="true">
           <div className="hp-phone-wrap">
             <div className="hp-phone">
@@ -129,14 +129,14 @@ export default function HomePage() {
                     <div className="hp-brainrot__card">
                       <p className="hp-brainrot__fact">
                         <strong>Did you know?</strong> Transformer models process
-                        context by computing attention across every token simultaneously —
+                        context by computing attention across every token simultaneously,
                         not sequentially like humans read.
                       </p>
                     </div>
                     <div className="hp-brainrot__card hp-brainrot__card--next">
                       <p className="hp-brainrot__fact">
                         This is why GPT-4 can &ldquo;see&rdquo; the beginning and end of your
-                        prompt at the same time — it&apos;s not reading left to right.
+                        prompt at the same time. It&apos;s not reading left to right.
                       </p>
                     </div>
                     <div className="hp-brainrot__progress">
@@ -196,7 +196,7 @@ export default function HomePage() {
           <p className="hp-eyebrow">How you feed it</p>
           <h2 className="hp-h2">Three ways to turn your content into brainrot.</h2>
           <p className="hp-sub hp-sub--center">
-            URL, file, or raw paste. Whatever format your knowledge lives in — Draftr eats it.
+            URL, file, or raw paste. Whatever format your knowledge lives in, Draftr eats it.
           </p>
         </div>
 
@@ -282,24 +282,6 @@ export default function HomePage() {
             <div className="hp-phone__btn hp-phone__btn--vol-down" />
             <div className="hp-phone__btn hp-phone__btn--power" />
           </div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ── */}
-      <section className="hp-cta">
-        <div className="hp-cta__inner">
-          <p className="hp-eyebrow hp-eyebrow--light">Start now, it&apos;s free</p>
-          <h2 className="hp-cta__headline">
-            You&apos;re going to watch brainrot anyway.<br />
-            <em>Make it count.</em>
-          </h2>
-          <p className="hp-cta__sub">
-            Join thousands of students, researchers, and knowledge junkies turning their backlog
-            into bingeable, brain-expanding content.
-          </p>
-          <a className="hp-btn hp-btn--primary hp-btn--lg" href="/chat">
-            Generate your first video — free <ArrowRight />
-          </a>
         </div>
       </section>
 

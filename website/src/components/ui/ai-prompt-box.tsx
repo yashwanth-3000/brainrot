@@ -110,7 +110,7 @@ function UploadModal({ onClose, onConfirm }: UploadModalProps) {
         {/* Two-panel body */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", minHeight: 320 }}>
 
-          {/* Left — Raw content */}
+          {/* Left - Raw content */}
           <div style={{
             display: "flex", flexDirection: "column",
             borderRight: "1px solid #e0dde8",
@@ -136,7 +136,7 @@ function UploadModal({ onClose, onConfirm }: UploadModalProps) {
             />
           </div>
 
-          {/* Right — File upload */}
+          {/* Right - File upload */}
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{
               padding: "12px 16px 8px",
@@ -262,10 +262,11 @@ interface PromptInputBoxProps {
   className?: string;
   mode?: ModeId | null;
   onModeChange?: (mode: ModeId | null) => void;
+  footerAccessory?: React.ReactNode;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
-  ({ onSend = () => {}, isLoading = false, placeholder = "Type your message here...", mode, onModeChange }, ref) => {
+  ({ onSend = () => {}, isLoading = false, placeholder = "Type your message here...", mode, onModeChange, footerAccessory }, ref) => {
     const [input, setInput] = React.useState("");
     const [files, setFiles] = React.useState<File[]>([]);
     const [rawContent, setRawContent] = React.useState("");
@@ -433,10 +434,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
           />
 
           {/* Action bar */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, paddingTop: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, paddingTop: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
 
-              {/* Paperclip — always visible */}
+              {/* Paperclip - always visible */}
               <button
                 onClick={() => setShowUploadModal(true)}
                 disabled={isLoading}
@@ -498,23 +499,27 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               </button>
             </div>
 
-            {/* Send button */}
-            <button
-              onClick={handleSubmit}
-              disabled={isLoading || !hasContent}
-              style={{
-                width: 32, height: 32, borderRadius: "50%", border: "none",
-                cursor: hasContent ? "pointer" : "default",
-                display: "inline-flex", alignItems: "center", justifyContent: "center",
-                background: hasContent ? "linear-gradient(135deg, #6d5bff 0%, #5235ef 100%)" : "rgba(0,0,0,0.08)",
-                color: hasContent ? "#fff" : "rgba(0,0,0,0.35)",
-                boxShadow: hasContent ? "0 4px 14px rgba(82,53,239,0.35)" : "none",
-                transition: "all 0.2s",
-                opacity: isLoading ? 0.6 : 1,
-              }}
-            >
-              <ArrowUp size={16} />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, marginLeft: "auto", flexWrap: "wrap" }}>
+              {footerAccessory}
+
+              {/* Send button */}
+              <button
+                onClick={handleSubmit}
+                disabled={isLoading || !hasContent}
+                style={{
+                  width: 32, height: 32, borderRadius: "50%", border: "none",
+                  cursor: hasContent ? "pointer" : "default",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  background: hasContent ? "linear-gradient(135deg, #6d5bff 0%, #5235ef 100%)" : "rgba(0,0,0,0.08)",
+                  color: hasContent ? "#fff" : "rgba(0,0,0,0.35)",
+                  boxShadow: hasContent ? "0 4px 14px rgba(82,53,239,0.35)" : "none",
+                  transition: "all 0.2s",
+                  opacity: isLoading ? 0.6 : 1,
+                }}
+              >
+                <ArrowUp size={16} />
+              </button>
+            </div>
           </div>
         </div>
 
