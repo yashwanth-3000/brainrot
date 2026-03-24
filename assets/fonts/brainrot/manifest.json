@@ -1,0 +1,44 @@
+{
+  "collection": "brainrot-fonts",
+  "saved_at": "2026-03-21",
+  "shared_asset_dir": "/Users/yashwanthkrishna/Desktop/ideas/assets/fonts/brainrot",
+  "web_public_dir": "/Users/yashwanthkrishna/Desktop/Brain-Rot/website/public/brainrot-fonts",
+  "fonts": [
+    {
+      "name": "Anton",
+      "file": "Anton-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf",
+      "usage": "Condensed all-caps hooks and aggressive subtitle callouts."
+    },
+    {
+      "name": "Bebas Neue",
+      "file": "BebasNeue-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "usage": "Clean tall headline font for fast-cut captions."
+    },
+    {
+      "name": "Archivo Black",
+      "file": "ArchivoBlack-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
+      "usage": "Heavy sans-serif for strong meme caption overlays."
+    },
+    {
+      "name": "Bangers",
+      "file": "Bangers-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/Bangers-Regular.ttf",
+      "usage": "Comic chaos font for louder brainrot title cards."
+    },
+    {
+      "name": "Luckiest Guy",
+      "file": "LuckiestGuy-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/apache/luckiestguy/LuckiestGuy-Regular.ttf",
+      "usage": "Playful exaggerated captions and comedic punchlines."
+    },
+    {
+      "name": "Lilita One",
+      "file": "LilitaOne-Regular.ttf",
+      "source_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/lilitaone/LilitaOne-Regular.ttf",
+      "usage": "Rounded bold text for softer but still loud subtitle styles."
+    }
+  ]
+}

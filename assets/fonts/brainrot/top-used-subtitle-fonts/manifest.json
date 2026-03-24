@@ -1,0 +1,42 @@
+{
+  "collection": "top-used-brainrot-subtitle-fonts",
+  "saved_at": "2026-03-21",
+  "directory": "/Users/yashwanthkrishna/Desktop/ideas/assets/fonts/brainrot/top-used-subtitle-fonts",
+  "fonts": [
+    {
+      "name": "Montserrat ExtraBold",
+      "file": "Montserrat-ExtraBold.ttf",
+      "download_url": "https://fonts.gstatic.com/s/montserrat/v31/JTUHjIg1_i6t8kCHKm4532VJOt5-QNFgpCvr70w-.ttf",
+      "why_selected": "Frequently recommended for short-form subtitles and cited as a go-to TikTok caption font."
+    },
+    {
+      "name": "Bebas Neue",
+      "file": "BebasNeue-Regular.ttf",
+      "download_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+      "why_selected": "Repeatedly recommended for TikTok and Shorts text because the tall all-caps shape grabs attention fast."
+    },
+    {
+      "name": "Anton",
+      "file": "Anton-Regular.ttf",
+      "download_url": "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf",
+      "why_selected": "Common for loud all-caps short-form caption styles, including the widely copied Hormozi-style subtitle look."
+    },
+    {
+      "name": "Komika Axis",
+      "file": "KomikaAxis-Regular.ttf",
+      "download_url": "https://dl.dafont.com/dl/?f=komika_axis",
+      "license_note": "Publicly distributed as personal-use freeware. Check licensing before commercial/shipped use.",
+      "why_selected": "Commonly identified as the MrBeast subtitle font and heavily copied in fast-paced YouTube/TikTok caption styles."
+    }
+  ],
+  "sources": [
+    "https://www.submagic.co/blog/best-font-for-subtitle",
+    "https://www.graphicpie.com/fonts-for-tiktok-subtitles/",
+    "https://sendshort.ai/guides/tiktok-font/",
+    "https://sendshort.ai/guides/youtube-shorts-font/",
+    "https://www.submagic.co/blog/how-to-make-alex-hormozi-captions",
+    "https://www.designyourway.net/blog/what-font-does-mrbeast-use/",
+    "https://caply.io/blog/mr-beast-font/",
+    "https://www.graphicpie.com/mr-beast-font/"
+  ]
+}
