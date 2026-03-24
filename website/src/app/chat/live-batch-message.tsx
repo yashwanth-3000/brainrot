@@ -363,6 +363,7 @@ export function LiveBatchMessage({ seed }: { seed: LiveBatchSeed }) {
             ...(liveMetadataByItem[item.id] ?? {}),
             ...(item.render_metadata ?? {}),
           };
+          const previewUrl = resolveBatchItemVideoUrl(batch.id, item);
           return {
             itemId: item.id,
             batchId: batch.id,
@@ -372,7 +373,8 @@ export function LiveBatchMessage({ seed }: { seed: LiveBatchSeed }) {
             sourceUrl: batch.source_url ?? null,
             status: item.status,
             outputUrl: item.output_url ?? null,
-            previewUrl: `/api/brainrot/batches/${batch.id}/items/${item.id}/video`,
+            previewUrl,
+            thumbnailUrl: stringValue(meta.thumbnail_url),
             subtitleStyleLabel: stringValue(meta.subtitle_style_label),
             subtitleAnimation: stringValue(meta.subtitle_animation),
             subtitleFontName: stringValue(meta.subtitle_font_name),
@@ -511,7 +513,7 @@ export function LiveBatchMessage({ seed }: { seed: LiveBatchSeed }) {
                       ...(liveMetadataByItem[item.id] ?? {}),
                       ...(item.render_metadata ?? {}),
                     };
-                    const videoPreviewUrl = batch ? `/api/brainrot/batches/${batch.id}/items/${item.id}/video` : null;
+                    const videoPreviewUrl = batch ? resolveBatchItemVideoUrl(batch.id, item) : null;
                     const hasVideo = item.status === "uploaded" && Boolean(item.output_url) && Boolean(videoPreviewUrl);
                     return (
                       <article key={item.id} className={styles.chatBatchItemCard}>
@@ -632,6 +634,13 @@ function shouldRefreshBatchForEvent(event: BatchEventRecord) {
 
 function shortId(value: string) {
   return value.slice(0, 8);
+}
+
+function resolveBatchItemVideoUrl(batchId: string, item: BatchItemRecord) {
+  if (item.output_url && item.output_url.startsWith("http")) {
+    return item.output_url;
+  }
+  return `/api/brainrot/batches/${batchId}/items/${item.id}/video`;
 }
 
 function OpenAIIcon({ size = 13 }: { size?: number }) {

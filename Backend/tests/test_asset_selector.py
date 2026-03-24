@@ -1,6 +1,8 @@
+from brainrot_backend.config import Settings
 from brainrot_backend.models.domain import AssetRecord, ScriptDraft
 from brainrot_backend.models.enums import AssetKind
 from brainrot_backend.render.assets import AssetSelector
+from brainrot_backend.services.assets import filter_allowed_gameplay_assets
 
 
 def test_asset_selector_prefers_tag_overlap():
@@ -39,3 +41,27 @@ def test_asset_selector_respects_used_asset_ids_when_scores_tie():
     second = AssetRecord(kind=AssetKind.GAMEPLAY, bucket="gameplay", path="two.mp4", tags=["fast"])
     chosen = selector.choose_gameplay(script, [first, second], used_asset_ids={first.id})
     assert chosen.id == second.id
+
+
+def test_filter_allowed_gameplay_assets_excludes_midnight_massacre():
+    settings = Settings(
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    allowed = AssetRecord(
+        kind=AssetKind.GAMEPLAY,
+        bucket="gameplay",
+        path="gameplay/minecraft/minecraft_clip_01.mp4",
+        metadata={"game": "minecraft"},
+    )
+    blocked = AssetRecord(
+        kind=AssetKind.GAMEPLAY,
+        bucket="gameplay",
+        path="gameplay/midnight-massacre/midnight-massacre_clip_01.mp4",
+        metadata={"game": "midnight-massacre"},
+    )
+
+    filtered = filter_allowed_gameplay_assets(settings, [allowed, blocked])
+
+    assert [asset.path for asset in filtered] == [allowed.path]

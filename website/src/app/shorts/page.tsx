@@ -23,6 +23,9 @@ type ChatSummary = {
   cover_batch_id: string | null
   cover_item_id: string | null
   cover_output_url: string | null
+  metadata?: {
+    cover_thumbnail_url?: string | null
+  }
 }
 
 type ChatEnvelope = { chat: ChatSummary }
@@ -45,6 +48,7 @@ type ChatGeneratedAsset = {
     subtitle_animation?: string | null
     subtitle_font_name?: string | null
     gameplay_asset_path?: string | null
+    thumbnail_url?: string | null
   }
   script: { title?: string | null; estimated_seconds?: number | null } | null
   created_at: string
@@ -65,6 +69,7 @@ type GeneratedShort = {
   batchId: string
   itemId: string
   videoUrl: string
+  thumbnailUrl: string | null
   updatedAt: string
   estimatedSeconds: number | null
   subtitleStyle: string | null
@@ -550,6 +555,7 @@ function ShortSlide({
           ref={videoRef}
           className={`${styles.shortVideo} ${hasLoadedFrame ? styles.shortVideoReady : ''}`}
           src={shouldPrime ? short.videoUrl : undefined}
+          poster={short.thumbnailUrl ?? undefined}
           playsInline
           loop
           preload={shouldPrime ? (isActive ? 'auto' : 'metadata') : 'none'}
@@ -716,26 +722,78 @@ function InfoRow({ label, value, href, mono }: { label: string; value: string; h
 }
 
 function ChatListCover({ chat }: { chat: ChatSummary }) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const coverThumbnailUrl = chat.metadata?.cover_thumbnail_url ?? null
+  const coverUrl = chat.cover_output_url && !chat.cover_output_url.startsWith('file://') ? chat.cover_output_url : null
   const [isReady, setIsReady] = useState(false)
-  const hasVideo = Boolean(chat.cover_output_url && !chat.cover_output_url.startsWith('file://'))
+  const [hasFailed, setHasFailed] = useState(false)
 
   useEffect(() => {
     setIsReady(false)
-  }, [chat.cover_output_url])
+    setHasFailed(false)
+
+    if (coverThumbnailUrl || !coverUrl) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHasFailed(true)
+    }, 4500)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [coverThumbnailUrl, coverUrl])
+
+  function primeCoverFrame() {
+    const video = videoRef.current
+    if (!video) {
+      return
+    }
+
+    const targetTime = Number.isFinite(video.duration) && video.duration > 0
+      ? Math.min(0.12, Math.max(video.duration * 0.02, 0.04))
+      : 0.08
+
+    try {
+      video.currentTime = targetTime
+    } catch {
+      setIsReady(true)
+    }
+  }
+
+  const shouldShowVideo = Boolean(!coverThumbnailUrl && coverUrl && !hasFailed)
 
   return (
     <div className={styles.chatListCover}>
-      {hasVideo ? (
+      {coverThumbnailUrl ? (
+        <img
+          className={`${styles.chatListVideo} ${styles.chatListVideoReady}`}
+          src={coverThumbnailUrl}
+          alt=""
+          loading="lazy"
+        />
+      ) : shouldShowVideo ? (
         <>
           <video
+            key={coverUrl}
+            ref={videoRef}
             className={`${styles.chatListVideo} ${isReady ? styles.chatListVideoReady : ''}`}
-            src={chat.cover_output_url ?? undefined}
+            src={coverUrl ?? undefined}
             muted
             loop
+            autoPlay
             playsInline
             preload="metadata"
+            onLoadedMetadata={primeCoverFrame}
+            onSeeked={() => setIsReady(true)}
             onLoadedData={() => setIsReady(true)}
             onCanPlay={() => setIsReady(true)}
+            onPlaying={() => setIsReady(true)}
+            onError={() => {
+              setHasFailed(true)
+              setIsReady(false)
+            }}
           />
           {!isReady ? <div className={styles.chatListCoverLoading} aria-hidden /> : null}
         </>
@@ -749,7 +807,7 @@ function ChatListCover({ chat }: { chat: ChatSummary }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapStoredToShort(s: StoredChatShort): GeneratedShort {
-  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: s.previewUrl, updatedAt: s.createdAt, estimatedSeconds: null, subtitleStyle: null, subtitleFont: null, gameplayAsset: null }
+  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: s.previewUrl, thumbnailUrl: s.thumbnailUrl ?? null, updatedAt: s.createdAt, estimatedSeconds: null, subtitleStyle: null, subtitleFont: null, gameplayAsset: null }
 }
 
 function mapAssetToShort(a: ChatGeneratedAsset): GeneratedShort {
@@ -765,6 +823,7 @@ function mapAssetToShort(a: ChatGeneratedAsset): GeneratedShort {
     sourceUrl: a.source_url ?? '#',
     batchId: a.batch_id, itemId: a.item_id,
     videoUrl: directVideoUrl,
+    thumbnailUrl: a.render_metadata?.thumbnail_url ?? null,
     updatedAt: a.updated_at,
     estimatedSeconds: a.script?.estimated_seconds ?? null,
     subtitleStyle: a.render_metadata?.subtitle_style_label ?? null,

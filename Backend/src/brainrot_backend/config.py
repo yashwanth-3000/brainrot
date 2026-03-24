@@ -84,6 +84,7 @@ class Settings(BaseSettings):
 
     auto_seed_assets: bool = True
     assets_dir: Path = Field(default_factory=lambda: _project_root() / "assets")
+    allowed_gameplay_games_csv: str = "gta-5,minecraft,roblox,subway-surfers"
 
     source_bucket: str = "sources"
     gameplay_bucket: str = "gameplay"
@@ -105,6 +106,14 @@ class Settings(BaseSettings):
     @property
     def elevenlabs_enabled(self) -> bool:
         return bool(self.elevenlabs_api_key)
+
+    @property
+    def allowed_gameplay_games(self) -> tuple[str, ...]:
+        return tuple(
+            part.strip().casefold()
+            for part in self.allowed_gameplay_games_csv.split(",")
+            if part.strip()
+        )
 
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

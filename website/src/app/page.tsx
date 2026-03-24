@@ -1,6 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 import './page.css'
 import Navbar from '@/components/ui/navbar'
+import HomeHeroVideo from './home-hero-video'
 
 const stats = [
   { value: '3 min', label: 'avg. video generated' },
@@ -111,60 +112,13 @@ export default function HomePage() {
             <div className="hp-phone">
               <div className="hp-phone__island" />
               <div className="hp-phone__screen">
-                <div className="hp-brainrot">
-                  {/* Gameplay background layer */}
-                  <div className="hp-brainrot__bg">
-                    <div className="hp-brainrot__pixel-row">
-                      <span /><span /><span /><span /><span /><span /><span /><span />
-                    </div>
-                    <div className="hp-brainrot__game-label">🎮 gameplay running</div>
-                  </div>
-
-                  {/* Content overlay */}
-                  <div className="hp-brainrot__overlay">
-                    <div className="hp-brainrot__source">
-                      <span className="hp-brainrot__source-icon">🔗</span>
-                      nature.com/articles/ai-research-2025
-                    </div>
-                    <div className="hp-brainrot__card">
-                      <p className="hp-brainrot__fact">
-                        <strong>Did you know?</strong> Transformer models process
-                        context by computing attention across every token simultaneously,
-                        not sequentially like humans read.
-                      </p>
-                    </div>
-                    <div className="hp-brainrot__card hp-brainrot__card--next">
-                      <p className="hp-brainrot__fact">
-                        This is why GPT-4 can &ldquo;see&rdquo; the beginning and end of your
-                        prompt at the same time. It&apos;s not reading left to right.
-                      </p>
-                    </div>
-                    <div className="hp-brainrot__progress">
-                      <div className="hp-brainrot__progress-bar" />
-                    </div>
-                    <div className="hp-brainrot__controls">
-                      <span>❤️ 24.1K</span>
-                      <span>💬 843</span>
-                      <span>↗️ Share</span>
-                    </div>
-                  </div>
-                </div>
+                <HomeHeroVideo />
               </div>
               <div className="hp-phone__btn hp-phone__btn--vol-up" />
               <div className="hp-phone__btn hp-phone__btn--vol-down" />
               <div className="hp-phone__btn hp-phone__btn--power" />
             </div>
 
-            {/* floating chips */}
-            <div className="hp-chip hp-chip--tl">
-              <span>🎮</span> Gameplay BG
-            </div>
-            <div className="hp-chip hp-chip--br">
-              <span>🧠</span> AI narration
-            </div>
-            <div className="hp-chip hp-chip--tr">
-              <span>📄</span> Your notes
-            </div>
           </div>
         </div>
       </section>

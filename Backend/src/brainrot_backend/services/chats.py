@@ -157,6 +157,7 @@ class ChatService:
         cover_batch_id: str | None = None
         cover_item_id: str | None = None
         cover_output_url: str | None = None
+        cover_thumbnail_url: str | None = None
 
         for batch in batches:
             items = await self.repository.get_batch_items(batch.id)
@@ -173,6 +174,13 @@ class ChatService:
                 cover_batch_id = batch.id
                 cover_item_id = cover_item.id
                 cover_output_url = cover_item.output_url
+                cover_thumbnail_url = str(cover_item.render_metadata.get("thumbnail_url") or "") or None
+
+        metadata = dict(chat.metadata) if chat is not None else {}
+        if cover_thumbnail_url:
+            metadata["cover_thumbnail_url"] = cover_thumbnail_url
+        else:
+            metadata.pop("cover_thumbnail_url", None)
 
         changes = {
             "title": title,
@@ -186,6 +194,7 @@ class ChatService:
             "cover_batch_id": cover_batch_id,
             "cover_item_id": cover_item_id,
             "cover_output_url": cover_output_url,
+            "metadata": metadata,
         }
 
         if chat is None:

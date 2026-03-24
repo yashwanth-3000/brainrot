@@ -1,8 +1,14 @@
+import asyncio
+from pathlib import Path
+
 import pytest
 
 from brainrot_backend.config import Settings
-from brainrot_backend.models.domain import WordTiming
-from brainrot_backend.render.subtitles import build_ass_karaoke, build_subtitle_track, subtitle_presets
+from brainrot_backend.models.domain import AssetRecord, WordTiming
+from brainrot_backend.models.enums import AssetKind
+from brainrot_backend.render.subtitles import SubtitlePreset, build_ass_karaoke, build_subtitle_track, subtitle_presets
+from brainrot_backend.services.assets import AssetService
+from brainrot_backend.storage.memory import InMemoryRepository, LocalBlobStore
 from brainrot_backend.workers.orchestrator import BatchOrchestrator
 
 
@@ -79,3 +85,97 @@ def test_subtitle_quota_map_biases_single_word_pop_komika():
         "single_word_pop_anton": 1,
         "single_word_pop_lilita": 1,
     }
+
+
+def test_auto_seed_font_assets_uploads_font_library(tmp_path):
+    settings = Settings(
+        project_root=tmp_path,
+        assets_dir=tmp_path / "assets",
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    fonts_dir = settings.assets_dir / "fonts" / "brainrot" / "top-used-subtitle-fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "KomikaAxis-Regular.ttf").write_bytes(b"komika")
+    (fonts_dir / "Montserrat-ExtraBold.ttf").write_bytes(b"montserrat")
+
+    repository = InMemoryRepository()
+    blob_store = LocalBlobStore(tmp_path / "blob")
+    service = AssetService(settings, repository, blob_store)
+
+    seeded = asyncio.run(service.auto_seed_font_assets())
+    font_assets = asyncio.run(repository.list_assets(AssetKind.FONT))
+
+    assert seeded == 2
+    assert sorted(Path(asset.path).name for asset in font_assets) == [
+        "KomikaAxis-Regular.ttf",
+        "Montserrat-ExtraBold.ttf",
+    ]
+    assert all((tmp_path / "blob" / settings.font_bucket / asset.path).exists() for asset in font_assets)
+
+
+def test_stage_subtitle_font_materializes_from_blob_store_when_local_font_is_missing(tmp_path):
+    settings = Settings(
+        project_root=tmp_path,
+        assets_dir=tmp_path / "assets",
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    repository = InMemoryRepository()
+    blob_store = LocalBlobStore(tmp_path / "blob")
+    source_path = "assets/fonts/brainrot/top-used-subtitle-fonts/KomikaAxis-Regular.ttf"
+    blob_path = "fonts/brainrot/top-used-subtitle-fonts/KomikaAxis-Regular.ttf"
+    asyncio.run(
+        blob_store.upload_bytes(
+            settings.font_bucket,
+            blob_path,
+            b"komika-axis",
+            content_type="font/ttf",
+        )
+    )
+    asyncio.run(
+        repository.create_asset(
+            AssetRecord(
+                kind=AssetKind.FONT,
+                bucket=settings.font_bucket,
+                path=blob_path,
+                metadata={
+                    "filename": "KomikaAxis-Regular.ttf",
+                    "source_path": source_path,
+                },
+            )
+        )
+    )
+    preset = SubtitlePreset(
+        id="single_word_pop",
+        label="Single Word Pop",
+        animation="single-word-pop",
+        family="single_word_pop",
+        font_name="Komika Axis",
+        font_path=settings.project_root / source_path,
+        font_size=112,
+        preferred_tags=(),
+        style_name="SingleWordPop",
+        selection_weight=60,
+    )
+    orchestrator = BatchOrchestrator(
+        settings=settings,
+        repository=repository,
+        blob_store=blob_store,
+        events=object(),
+        firecrawl=object(),
+        agent_service=object(),
+        chat_service=object(),
+        asset_selector=object(),
+        renderer=object(),
+    )
+
+    font_dir = asyncio.run(orchestrator._stage_subtitle_font(tmp_path / "job", preset))
+
+    assert (font_dir / "KomikaAxis-Regular.ttf").read_bytes() == b"komika-axis"

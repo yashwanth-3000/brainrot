@@ -527,6 +527,123 @@
   border-radius: 36px;
 }
 
+.hp-hero-video {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background:
+    radial-gradient(circle at top, rgba(125, 91, 255, 0.2), transparent 42%),
+    #0d0c14;
+  overflow: hidden;
+}
+
+.hp-hero-video__media {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* bottom gradient — same as shorts player */
+.hp-hero-video__gradient {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 40%,
+    rgba(0, 0, 0, 0.45) 68%,
+    rgba(0, 0, 0, 0.88) 100%
+  );
+  pointer-events: none;
+}
+
+
+/* mute button — top right, circular, shorts style */
+.hp-hero-video__mute {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.hp-hero-video__mute:hover {
+  background: rgba(0, 0, 0, 0.78);
+  transform: scale(1.12);
+}
+
+.hp-hero-video__mute:active {
+  transform: scale(0.9);
+}
+
+/* bottom info overlay */
+.hp-hero-video__info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  padding: 16px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hp-hero-video__author {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.hp-hero-video__avatar {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5235ef, #8a73ff);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+}
+
+.hp-hero-video__name {
+  margin: 0 0 1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1;
+}
+
+.hp-hero-video__time {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
+}
+
+.hp-hero-video__title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+
 /* buttons */
 .hp-phone__btn { position: absolute; background: #1e1c28; }
 .hp-phone__btn--vol-up   { left: -3px; top: 118px; width: 3px; height: 30px; border-radius: 2px 0 0 2px; }

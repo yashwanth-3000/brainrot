@@ -39,9 +39,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         if resolved_settings.auto_seed_assets:
             try:
-                seeded = await container.asset_service.auto_seed_gameplay_assets()
-                if seeded > 0:
-                    logger.info("Auto-seeded %d gameplay assets on startup", seeded)
+                seeded_gameplay = await container.asset_service.auto_seed_gameplay_assets()
+                if seeded_gameplay > 0:
+                    logger.info("Auto-seeded %d gameplay assets on startup", seeded_gameplay)
+                seeded_fonts = await container.asset_service.auto_seed_font_assets()
+                if seeded_fonts > 0:
+                    logger.info("Auto-seeded %d subtitle fonts on startup", seeded_fonts)
             except Exception as exc:
                 logger.warning("Auto-seed failed (non-fatal): %s", exc)
         try:

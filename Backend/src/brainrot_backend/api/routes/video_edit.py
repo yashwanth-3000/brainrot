@@ -14,6 +14,7 @@ from brainrot_backend.models.api import (
 )
 from brainrot_backend.models.enums import AssetKind
 from brainrot_backend.render.subtitles import subtitle_presets
+from brainrot_backend.services.assets import filter_allowed_gameplay_assets
 
 router = APIRouter(prefix="/video-edit", tags=["video-edit"])
 
@@ -21,7 +22,10 @@ router = APIRouter(prefix="/video-edit", tags=["video-edit"])
 @router.get("/options", response_model=VideoEditOptionsResponse)
 async def get_video_edit_options(request: Request) -> VideoEditOptionsResponse:
     container = request.app.state.container
-    gameplay_assets = await container.repository.list_assets(AssetKind.GAMEPLAY)
+    gameplay_assets = filter_allowed_gameplay_assets(
+        container.settings,
+        await container.repository.list_assets(AssetKind.GAMEPLAY),
+    )
     presets = [
         SubtitlePresetOption(
             id=preset.id,

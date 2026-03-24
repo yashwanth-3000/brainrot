@@ -17,6 +17,7 @@ from brainrot_backend.render.assets import AssetSelector
 from brainrot_backend.render.ffmpeg import FFmpegRenderer
 from brainrot_backend.render.subtitles import SubtitlePreset, build_subtitle_track, subtitle_presets
 from brainrot_backend.services.agents import AgentService
+from brainrot_backend.services.assets import filter_allowed_gameplay_assets
 from brainrot_backend.services.chats import ChatService
 from brainrot_backend.services.events import EventBroker
 from brainrot_backend.storage.base import BlobStore, Repository
@@ -47,6 +48,7 @@ class BatchOrchestrator:
         self.chat_service = chat_service
         self.asset_selector = asset_selector
         self.renderer = renderer
+        self._font_assets_by_key: dict[str, AssetRecord] | None = None
 
     async def run_batch(self, batch_id: str, *, retry_failed_only: bool = False) -> None:
         batch = await self.repository.get_batch(batch_id)
@@ -97,7 +99,7 @@ class BatchOrchestrator:
                 logger.info("Source ingested for batch %s: %s (%d chars)", batch_id, source.title, len(source.markdown))
 
             candidates = await self.repository.list_assets()
-            gameplay_assets = [asset for asset in candidates if asset.kind == AssetKind.GAMEPLAY]
+            gameplay_assets = filter_allowed_gameplay_assets(self.settings, candidates)
             music_assets = [asset for asset in candidates if asset.kind == AssetKind.MUSIC]
 
             if not gameplay_assets:
@@ -404,7 +406,10 @@ class BatchOrchestrator:
         if batch is None or item is None:
             raise RuntimeError(f"Preview batch {batch_id} is not available.")
 
-        gameplay_assets = await self.repository.list_assets(AssetKind.GAMEPLAY)
+        gameplay_assets = filter_allowed_gameplay_assets(
+            self.settings,
+            await self.repository.list_assets(AssetKind.GAMEPLAY),
+        )
         music_assets = await self.repository.list_assets(AssetKind.MUSIC)
         gameplay = next((asset for asset in gameplay_assets if asset.id == gameplay_asset_id), None)
         if gameplay is None:
@@ -492,7 +497,7 @@ class BatchOrchestrator:
             item_dir / "subtitles.ass",
             preset=subtitle_preset,
         )
-        subtitle_font_dir = self._stage_subtitle_font(item_dir, subtitle_track.preset)
+        subtitle_font_dir = await self._stage_subtitle_font(item_dir, subtitle_track.preset)
 
         await self.blob_store.upload_bytes(
             self.settings.subtitle_bucket,
@@ -572,6 +577,19 @@ class BatchOrchestrator:
             item_index=item.item_index,
             elapsed_seconds=round(time.perf_counter() - render_started_at, 1),
         )
+        thumbnail_public_url: str | None = None
+        thumbnail_path = item_dir / "thumbnail.jpg"
+        try:
+            await self._generate_thumbnail(output_path=output_path, thumbnail_path=thumbnail_path)
+            thumbnail_public_url = await self.blob_store.upload_bytes(
+                self.settings.final_render_bucket,
+                f"{batch.id}/{item.id}.jpg",
+                thumbnail_path.read_bytes(),
+                content_type="image/jpeg",
+            )
+        except Exception as exc:  # pragma: no cover - best-effort thumbnailing
+            logger.warning("Thumbnail generation failed for item %s: %s", item.id, exc)
+
         public_url = await self.blob_store.upload_bytes(
             self.settings.final_render_bucket,
             f"{batch.id}/{item.id}.mp4",
@@ -597,6 +615,7 @@ class BatchOrchestrator:
                 "subtitle_font_name": subtitle_track.preset.font_name,
                 "subtitle_font_file": subtitle_track.preset.font_path.name,
                 "subtitle_font_source_path": str(subtitle_track.preset.font_path),
+                "thumbnail_url": thumbnail_public_url,
             },
         )
         await self.events.publish(
@@ -611,6 +630,29 @@ class BatchOrchestrator:
         logger.info("Item %s completed: %s", item.id, public_url)
 
         self._cleanup_temp(item_dir)
+
+    async def _generate_thumbnail(self, *, output_path: Path, thumbnail_path: Path) -> Path:
+        thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+        command = [
+            self.settings.ffmpeg_bin,
+            "-y",
+            "-ss", "0.35",
+            "-i", str(output_path),
+            "-frames:v", "1",
+            "-vf", "scale=270:480:force_original_aspect_ratio=increase,crop=270:480",
+            "-q:v", "2",
+            str(thumbnail_path),
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+        if process.returncode != 0:
+            error_text = stderr.decode("utf-8", errors="ignore")
+            raise RuntimeError(f"FFmpeg thumbnail extraction failed: {error_text[-500:]}")
+        return thumbnail_path
 
     def _plan_assets(
         self,
@@ -845,15 +887,55 @@ class BatchOrchestrator:
         ).encode("utf-8")
         return int(hashlib.sha256(payload).hexdigest()[:8], 16)
 
-    @staticmethod
-    def _stage_subtitle_font(item_dir: Path, preset: SubtitlePreset) -> Path | None:
-        if not preset.font_path.exists():
-            raise RuntimeError(f"Subtitle font is missing: {preset.font_path}")
+    async def _stage_subtitle_font(self, item_dir: Path, preset: SubtitlePreset) -> Path | None:
         font_dir = item_dir / "fonts"
         font_dir.mkdir(parents=True, exist_ok=True)
         destination = font_dir / preset.font_path.name
-        shutil.copy2(preset.font_path, destination)
+        if preset.font_path.exists():
+            shutil.copy2(preset.font_path, destination)
+            return font_dir
+
+        font_asset = await self._find_subtitle_font_asset(preset)
+        if font_asset is None:
+            raise RuntimeError(f"Subtitle font is missing: {preset.font_path}")
+        await self.blob_store.materialize(font_asset.bucket, font_asset.path, destination)
         return font_dir
+
+    async def _find_subtitle_font_asset(self, preset: SubtitlePreset) -> AssetRecord | None:
+        font_assets = await self._font_asset_index()
+        relative_source_path = None
+        with suppress(ValueError):
+            relative_source_path = str(preset.font_path.relative_to(self.settings.project_root))
+        candidate_keys = [
+            preset.font_path.name.lower(),
+            str(preset.font_path).lower(),
+        ]
+        if relative_source_path:
+            candidate_keys.append(relative_source_path.lower())
+        for key in candidate_keys:
+            asset = font_assets.get(key)
+            if asset is not None:
+                return asset
+        return None
+
+    async def _font_asset_index(self) -> dict[str, AssetRecord]:
+        if self._font_assets_by_key is not None:
+            return self._font_assets_by_key
+
+        index: dict[str, AssetRecord] = {}
+        for asset in await self.repository.list_assets(AssetKind.FONT):
+            keys = {Path(asset.path).name.lower(), asset.path.lower()}
+            filename = asset.metadata.get("filename")
+            if isinstance(filename, str) and filename:
+                keys.add(filename.lower())
+            source_path = asset.metadata.get("source_path")
+            if isinstance(source_path, str) and source_path:
+                keys.add(source_path.lower())
+                keys.add(Path(source_path).name.lower())
+            for key in keys:
+                index.setdefault(key, asset)
+        self._font_assets_by_key = index
+        return index
 
     async def _set_batch_status(self, batch_id: str, status: BatchStatus) -> BatchRecord:
         batch = await self.repository.update_batch(batch_id, status=status, error=None)

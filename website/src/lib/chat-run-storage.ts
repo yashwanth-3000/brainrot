@@ -8,6 +8,7 @@ export type StoredChatShort = {
   status: string;
   outputUrl: string | null;
   previewUrl: string;
+  thumbnailUrl: string | null;
   subtitleStyleLabel: string | null;
   subtitleAnimation: string | null;
   subtitleFontName: string | null;
