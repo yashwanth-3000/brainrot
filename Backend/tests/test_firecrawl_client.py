@@ -3,9 +3,9 @@ import asyncio
 import httpx
 
 from brainrot_backend.config import Settings
-from brainrot_backend.integrations.firecrawl import FirecrawlClient
-from brainrot_backend.models.domain import IngestedSource
-from brainrot_backend.models.enums import SourceKind
+from brainrot_backend.video_generator.integrations.firecrawl import FirecrawlClient
+from brainrot_backend.shared.models.domain import IngestedSource
+from brainrot_backend.shared.models.enums import SourceKind
 
 
 def test_scrape_url_falls_back_to_markdown_only_after_timeout():

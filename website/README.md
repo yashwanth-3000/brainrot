@@ -42,6 +42,12 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+`npm run dev` uses webpack by default for a more stable local workflow in this nested repo layout. If you specifically want to test Turbopack, run:
+
+```bash
+npm run dev:turbopack
+```
+
 ## Environment Variables
 
 | Variable | Required | Default | Description |
@@ -178,7 +184,9 @@ Glassmorphic dark navigation bar with links to Chat, Shorts, About, and a GitHub
 
 ```bash
 npm run dev      # Start development server (http://localhost:3000)
+npm run dev:turbopack
 npm run build    # Production build
+npm run build:webpack
 npm run start    # Run production server
 npm run lint     # Run ESLint
 ```

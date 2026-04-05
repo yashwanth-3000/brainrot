@@ -1,7 +1,7 @@
 import io
 import wave
 
-from brainrot_backend.integrations.elevenlabs import (
+from brainrot_backend.video_generator.integrations.elevenlabs import (
     normalize_conversation_audio,
     trim_wav_trailing_padding,
     word_timings_from_alignment,

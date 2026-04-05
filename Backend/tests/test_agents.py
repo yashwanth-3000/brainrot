@@ -1,14 +1,14 @@
 import json
 
 from brainrot_backend.config import Settings
-from brainrot_backend.integrations.elevenlabs import (
+from brainrot_backend.video_generator.integrations.elevenlabs import (
     build_narrator_override,
     build_producer_dynamic_variables,
 )
-from brainrot_backend.models.domain import GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
-from brainrot_backend.models.domain import AnglePlan
-from brainrot_backend.models.enums import SourceKind
-from brainrot_backend.services.agents import AgentService
+from brainrot_backend.shared.models.domain import GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
+from brainrot_backend.shared.models.domain import AnglePlan
+from brainrot_backend.shared.models.enums import SourceKind
+from brainrot_backend.video_generator.services.agents import AgentService
 
 
 def test_build_producer_dynamic_variables_serializes_context():

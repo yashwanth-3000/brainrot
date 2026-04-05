@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
-import { ArrowLeft, Sparkles, User } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeft, Minus, Plus, Sparkles, User } from "lucide-react";
 
 import { PromptInputBox, type PromptSendPayload, type ModeId } from "@/components/ui/ai-prompt-box";
 import Navbar from "@/components/ui/navbar";
@@ -43,11 +44,40 @@ const blockMotion = {
 };
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<ChatPageFallback />}>
+      <ChatPageContent />
+    </Suspense>
+  );
+}
+
+function ChatPageFallback() {
+  return <ChatPageInner requestedChatId={null} prefillPrompt="" />;
+}
+
+function ChatPageContent() {
+  const searchParams = useSearchParams();
+  return (
+    <ChatPageInner
+      requestedChatId={searchParams.get("chat")}
+      prefillPrompt={searchParams.get("prefill") ?? ""}
+    />
+  );
+}
+
+function ChatPageInner({
+  requestedChatId,
+  prefillPrompt,
+}: {
+  requestedChatId: string | null;
+  prefillPrompt: string;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [composerMode, setComposerMode] = useState<ModeId | null>(null);
-  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [chatSessionId, setChatSessionId] = useState<string | null>(requestedChatId);
   const [batchCount, setBatchCount] = useState(() => readStoredBatchCount());
+  const [draftMessage, setDraftMessage] = useState(prefillPrompt);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const isEmpty = messages.length === 0;
@@ -60,6 +90,14 @@ export default function ChatPage() {
   useEffect(() => {
     scrollToBottom("smooth");
   }, [messages.length, scrollToBottom]);
+
+  useEffect(() => {
+    setChatSessionId(requestedChatId);
+  }, [requestedChatId]);
+
+  useEffect(() => {
+    setDraftMessage(prefillPrompt);
+  }, [prefillPrompt]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -104,6 +142,7 @@ export default function ChatPage() {
     };
 
     setMessages(previous => [...previous, userMsg, assistantMsg]);
+    setDraftMessage("");
     setIsLoading(true);
 
     try {
@@ -261,6 +300,8 @@ export default function ChatPage() {
                     placeholder="Paste a URL, upload a PDF, or add a title hint..."
                     mode={composerMode}
                     onModeChange={setComposerMode}
+                    value={draftMessage}
+                    onValueChange={setDraftMessage}
                     footerAccessory={<BatchCountAccessory value={batchCount} onChange={setBatchCount} disabled={isLoading} />}
                   />
                 </div>
@@ -354,6 +395,8 @@ export default function ChatPage() {
                     placeholder="Paste another URL or upload another PDF..."
                     mode={composerMode}
                     onModeChange={setComposerMode}
+                    value={draftMessage}
+                    onValueChange={setDraftMessage}
                     footerAccessory={<BatchCountAccessory value={batchCount} onChange={setBatchCount} disabled={isLoading} />}
                   />
                   <p className={styles.inputDisclaimer}>
@@ -486,10 +529,24 @@ function BatchCountAccessory({
 }) {
   return (
     <div className={styles.batchCountAccessory}>
-      <label className={styles.batchCountAccessoryLabel} htmlFor="chat-batch-count">
-        Videos
-      </label>
+      <div className={styles.batchCountAccessoryMeta}>
+        <label className={styles.batchCountAccessoryLabel} htmlFor="chat-batch-count">
+          Videos
+        </label>
+        <span className={styles.batchCountAccessoryHint}>
+          {MIN_CHAT_BATCH_COUNT} to {MAX_CHAT_BATCH_COUNT}
+        </span>
+      </div>
       <div className={styles.batchCountAccessoryFieldWrap}>
+        <button
+          type="button"
+          className={styles.batchCountAccessoryStepperButton}
+          onClick={() => onChange(clampBatchCount(value - 1))}
+          disabled={disabled || value <= MIN_CHAT_BATCH_COUNT}
+          aria-label="Decrease number of videos"
+        >
+          <Minus size={13} strokeWidth={2.4} />
+        </button>
         <input
           id="chat-batch-count"
           type="number"
@@ -501,7 +558,15 @@ function BatchCountAccessory({
           onChange={event => onChange(clampBatchCount(Number(event.target.value)))}
           className={styles.batchCountAccessoryField}
         />
-        <span className={styles.batchCountAccessoryHint}>{MIN_CHAT_BATCH_COUNT} to {MAX_CHAT_BATCH_COUNT}</span>
+        <button
+          type="button"
+          className={styles.batchCountAccessoryStepperButton}
+          onClick={() => onChange(clampBatchCount(value + 1))}
+          disabled={disabled || value >= MAX_CHAT_BATCH_COUNT}
+          aria-label="Increase number of videos"
+        >
+          <Plus size={13} strokeWidth={2.4} />
+        </button>
       </div>
     </div>
   );

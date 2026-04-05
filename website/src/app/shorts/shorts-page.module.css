@@ -9,6 +9,12 @@
   font-family: var(--font-body, 'DM Sans', sans-serif);
 }
 
+.rootResizing,
+.rootResizing * {
+  cursor: col-resize !important;
+  user-select: none;
+}
+
 .libraryLayout {
   flex: 1;
   min-height: 0;
@@ -315,13 +321,161 @@
   position: relative;
   overflow: hidden;
   display: flex;
-  align-items: center;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 18px 20px 20px;
+}
+
+.stageGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.stageGridWithRail {
+  grid-template-columns: minmax(0, 1fr) 16px var(--insights-width, 380px);
+  gap: 0;
+}
+
+.feedColumn {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
   justify-content: center;
 }
 
-.feedViewport {
+.recommendationRail {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-left: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(137, 115, 255, 0.18) transparent;
+}
+
+.recommendationRail::-webkit-scrollbar {
+  width: 4px;
+}
+
+.recommendationRail::-webkit-scrollbar-thumb {
+  background: rgba(137, 115, 255, 0.2);
+  border-radius: 999px;
+}
+
+.recommendationRailHandle {
+  align-self: stretch;
+  width: 16px;
+  border: none;
+  padding: 0;
+  background: transparent;
+  cursor: col-resize;
+  position: relative;
+}
+
+.recommendationRailHandle::before {
+  content: '';
   position: absolute;
-  inset: 0;
+  top: 20px;
+  bottom: 20px;
+  left: 7px;
+  width: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.recommendationRailHandle span {
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 10px;
+  height: 52px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgba(137, 115, 255, 0.14);
+  border: 1px solid rgba(137, 115, 255, 0.16);
+}
+
+.recommendationRailHeader {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding: 8px 0 10px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.96), rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0));
+}
+
+.recommendationRailEyebrow {
+  margin: 0 0 4px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(203, 191, 255, 0.62);
+}
+
+.recommendationRailTitle {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.05;
+  color: #f6f1ff;
+  font-family: var(--font-display, serif);
+}
+
+.recommendationRailToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(137, 115, 255, 0.18);
+  background: rgba(137, 115, 255, 0.08);
+  color: #d5cbff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recommendationDockButton {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 220px;
+  padding: 12px 14px;
+  border: 1px solid rgba(144, 123, 255, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(15, 10, 32, 0.9), rgba(8, 7, 18, 0.94));
+  color: #f6f1ff;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+}
+
+.recommendationDockEyebrow {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(203, 191, 255, 0.62);
+}
+
+.recommendationDockTitle {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: left;
+}
+
+.feedViewport {
+  position: relative;
+  width: min(100%, 480px);
+  height: 100%;
   transition:
     opacity 0.28s ease,
     transform 0.32s ease,
@@ -367,6 +521,269 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: rgba(229, 223, 255, 0.76);
+}
+
+.recommendationCard {
+  position: relative;
+  top: auto;
+  z-index: 2;
+  width: 100%;
+  padding: 14px 14px 16px;
+  border-radius: 22px;
+  border: 1px solid rgba(144, 123, 255, 0.18);
+  background:
+    linear-gradient(180deg, rgba(15, 10, 32, 0.88), rgba(8, 7, 18, 0.92));
+  backdrop-filter: blur(16px);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.34);
+}
+
+.recommendationHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recommendationKicker {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(203, 191, 255, 0.56);
+}
+
+.recommendationTitle {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #f6f1ff;
+  font-family: var(--font-display, serif);
+}
+
+.recommendationCopy {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(224, 216, 252, 0.68);
+}
+
+.recommendationStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.recommendationStat {
+  padding: 9px 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.recommendationStatValue {
+  display: block;
+  font-size: 17px;
+  line-height: 1;
+  font-weight: 600;
+  color: #f5f1ff;
+}
+
+.recommendationStatLabel {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(197, 188, 234, 0.5);
+}
+
+.recommendationSignals {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.retentionSummaryBlock {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.retentionSummaryHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.retentionSummaryTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #f5f1ff;
+}
+
+.retentionSummaryCopy {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(197, 188, 234, 0.58);
+}
+
+.retentionSummaryList {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.retentionSummaryRow {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid rgba(137, 115, 255, 0.14);
+  background: rgba(137, 115, 255, 0.04);
+}
+
+.retentionSummaryRowTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.retentionSummaryMeta {
+  min-width: 0;
+}
+
+.retentionSummaryIndex {
+  display: inline-flex;
+  margin-bottom: 6px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(203, 191, 255, 0.52);
+}
+
+.retentionSummaryMetric {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 10px;
+  color: rgba(235, 229, 255, 0.78);
+}
+
+.retentionSummaryRowTitle {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #f5f1ff;
+}
+
+.retentionSummaryRowCopy {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: rgba(224, 216, 252, 0.72);
+}
+
+.retentionSummaryTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.retentionSummaryTags span {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 10px;
+  color: rgba(220, 214, 248, 0.78);
+}
+
+.retentionSummaryEmpty {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  line-height: 1.5;
+  color: rgba(200, 191, 236, 0.64);
+}
+
+.recommendationSignal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(137, 115, 255, 0.14);
+  background: rgba(137, 115, 255, 0.06);
+}
+
+.recommendationSignalLabel {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(203, 191, 255, 0.52);
+  flex-shrink: 0;
+}
+
+.recommendationSignalValue {
+  display: block;
+  min-width: 0;
+  text-align: right;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #f4efff;
+}
+
+.recommendationFooter {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.recommendationFootnote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: rgba(194, 186, 230, 0.58);
+}
+
+.recommendationLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #755dff 0%, #5235ef 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 12px 28px rgba(82, 53, 239, 0.32);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 100%;
+}
+
+.recommendationLink:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 34px rgba(82, 53, 239, 0.36);
 }
 
 /* Empty / loading states */
@@ -471,30 +888,34 @@
 
 /* Scrollable feed */
 .feed {
-  position: absolute;
-  inset: 0;
-  overflow-y: scroll;
-  /* mandatory so snap is always enforced, never skipped */
-  scroll-snap-type: y mandatory;
-  /* prevent scroll bleeding to parent or triggering pull-to-refresh */
-  overscroll-behavior-y: contain;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  position: relative;
+  inset: auto;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-y;
+  outline: none;
 }
-
-.feed::-webkit-scrollbar { display: none; }
 
 /* Each full-height slide */
 .slide {
-  /* 100% of the feed's clientHeight (the visible area, not total scroll height) */
-  height: 100%;
-  /* CRITICAL: forces browser to stop on THIS slide — no skipping on fast scroll */
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px 32px 16px 16px;
+  transition: transform 0.68s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease;
+}
+
+.slideActive {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.slideInactive {
+  opacity: 0.25;
+  pointer-events: none;
 }
 
 /* ── Short card — YouTube Shorts style ────────────────────────── */
@@ -967,6 +1388,54 @@
 
   .mainCanvas {
     min-height: 70dvh;
+    padding: 12px 14px 18px;
+  }
+
+  .stageGridWithRail {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .recommendationRail {
+    overflow: visible;
+    padding-left: 0;
+  }
+
+  .recommendationRailHeader {
+    position: static;
+    padding-top: 0;
+  }
+
+  .recommendationRailHandle {
+    display: none;
+  }
+
+  .recommendationCard {
+    padding: 14px;
+  }
+
+  .recommendationDockButton {
+    top: 12px;
+    right: 14px;
+  }
+
+  .recommendationHeader {
+    flex-direction: column;
+  }
+
+  .recommendationStats {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .retentionSummaryHeader,
+  .retentionSummaryRow {
+    flex-direction: column;
+  }
+
+  .retentionSummaryTags {
+    max-width: none;
+    justify-content: flex-start;
   }
 
   .feed { position: absolute; inset: 0; }
@@ -988,6 +1457,19 @@
 
   .chatBarSource {
     display: none;
+  }
+
+  .recommendationTitle {
+    font-size: 18px;
+  }
+
+  .recommendationStats {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendationFooter {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .shortRow {

@@ -263,11 +263,13 @@ interface PromptInputBoxProps {
   mode?: ModeId | null;
   onModeChange?: (mode: ModeId | null) => void;
   footerAccessory?: React.ReactNode;
+  value?: string;
+  onValueChange?: (value: string) => void;
 }
 
 export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>(
-  ({ onSend = () => {}, isLoading = false, placeholder = "Type your message here...", mode, onModeChange, footerAccessory }, ref) => {
-    const [input, setInput] = React.useState("");
+  ({ onSend = () => {}, isLoading = false, placeholder = "Type your message here...", mode, onModeChange, footerAccessory, value, onValueChange }, ref) => {
+    const [internalInput, setInternalInput] = React.useState("");
     const [files, setFiles] = React.useState<File[]>([]);
     const [rawContent, setRawContent] = React.useState("");
     const [internalActiveMode, setInternalActiveMode] = React.useState<ModeId | null>(null);
@@ -278,6 +280,12 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     const urlInputRef = React.useRef<HTMLInputElement>(null);
 
     const activeMode = mode !== undefined ? mode : internalActiveMode;
+    const input = value !== undefined ? value : internalInput;
+
+    const setInput = React.useCallback((next: string) => {
+      if (onValueChange) onValueChange(next);
+      else setInternalInput(next);
+    }, [onValueChange]);
 
     const toggleSearch = () => {
       const next = activeMode === "search" ? null : "search";

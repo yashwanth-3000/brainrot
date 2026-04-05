@@ -4,12 +4,12 @@ from pathlib import Path
 import pytest
 
 from brainrot_backend.config import Settings
-from brainrot_backend.models.domain import AssetRecord, WordTiming
-from brainrot_backend.models.enums import AssetKind
-from brainrot_backend.render.subtitles import SubtitlePreset, build_ass_karaoke, build_subtitle_track, subtitle_presets
-from brainrot_backend.services.assets import AssetService
-from brainrot_backend.storage.memory import InMemoryRepository, LocalBlobStore
-from brainrot_backend.workers.orchestrator import BatchOrchestrator
+from brainrot_backend.shared.models.domain import AssetRecord, WordTiming
+from brainrot_backend.shared.models.enums import AssetKind
+from brainrot_backend.video_generator.render.subtitles import SubtitlePreset, build_ass_karaoke, build_subtitle_track, subtitle_presets
+from brainrot_backend.video_generator.services.assets import AssetService
+from brainrot_backend.shared.storage.memory import InMemoryRepository, LocalBlobStore
+from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator
 
 
 def test_build_ass_karaoke_writes_dialogue(tmp_path):

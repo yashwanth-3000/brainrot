@@ -1,4 +1,4 @@
-from brainrot_backend.integrations.firecrawl import extract_candidate_urls, rank_site_urls
+from brainrot_backend.video_generator.integrations.firecrawl import extract_candidate_urls, rank_site_urls
 
 
 def test_rank_site_urls_prioritizes_content_paths():

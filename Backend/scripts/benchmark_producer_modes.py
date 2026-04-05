@@ -13,8 +13,8 @@ from typing import Any
 import httpx
 
 from brainrot_backend.config import Settings
-from brainrot_backend.models.domain import ScriptDraft
-from brainrot_backend.services.agents import _count_words, _script_quality_issues
+from brainrot_backend.shared.models.domain import ScriptDraft
+from brainrot_backend.video_generator.services.agents import _count_words, _script_quality_issues
 
 
 MODES = ("direct_openai", "elevenlabs_native")

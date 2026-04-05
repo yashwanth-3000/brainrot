@@ -2,8 +2,8 @@ from fastapi.testclient import TestClient
 
 from brainrot_backend.config import Settings
 from brainrot_backend.main import create_app
-from brainrot_backend.models.domain import AgentConfigRecord
-from brainrot_backend.models.enums import AgentRole, BatchItemStatus
+from brainrot_backend.shared.models.domain import AgentConfigRecord, ScriptDraft
+from brainrot_backend.shared.models.enums import AgentRole, BatchItemStatus
 
 
 def test_health_endpoint():
@@ -295,3 +295,205 @@ def test_public_chat_list_hides_empty_chats(tmp_path):
         items = chat_list_response.json()["items"]
         assert len(items) == 1
         assert items[0]["id"] == exported_chat_id
+
+
+def test_chat_recommendations_prefer_high_retention_formats(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        app.state.container.batch_service._schedule = lambda *args, **kwargs: None
+        repository = app.state.container.repository
+        chat_service = app.state.container.chat_service
+        import asyncio
+
+        asyncio.run(
+            repository.upsert_agent_config(
+                AgentConfigRecord(
+                    role=AgentRole.PRODUCER,
+                    name="Producer",
+                    agent_id="producer-agent",
+                )
+            )
+        )
+        asyncio.run(
+            repository.upsert_agent_config(
+                AgentConfigRecord(
+                    role=AgentRole.NARRATOR,
+                    name="Narrator",
+                    agent_id="narrator-agent",
+                )
+            )
+        )
+
+        chat_response = client.post("/v1/chats", json={"title": "Retention chat"})
+        assert chat_response.status_code == 200
+        chat_id = chat_response.json()["chat"]["id"]
+
+        batch_payload = client.post(
+            "/v1/batches",
+            data={
+                "chat_id": chat_id,
+                "source_url": "https://example.com/retention",
+                "title_hint": "Retention source",
+                "count": "5",
+            },
+        ).json()
+
+        first_item = batch_payload["items"][0]
+        second_item = batch_payload["items"][1]
+        third_item = batch_payload["items"][2]
+
+        asyncio.run(
+            repository.update_batch_item(
+                first_item["id"],
+                status=BatchItemStatus.UPLOADED,
+                output_url="file:///tmp/high-retention.mp4",
+                render_metadata={
+                    "subtitle_style_label": "Single Word Pop",
+                    "subtitle_font_name": "Komika Axis",
+                    "gameplay_asset_path": "gameplay/roblox/roblox_clip_08.mp4",
+                },
+                script=ScriptDraft(
+                    title="The hidden risk in AI agents",
+                    hook="The hidden risk in AI agents",
+                    narration_text="The hidden risk in AI agents is not just model quality. It is the invisible operational drag teams discover too late.",
+                    caption_text="The hidden risk in AI agents",
+                    estimated_seconds=25.0,
+                    visual_beats=[],
+                    music_tags=[],
+                    gameplay_tags=[],
+                    source_facts_used=["AI agent operations can create hidden overhead."],
+                ),
+            )
+        )
+        asyncio.run(
+            repository.update_batch_item(
+                second_item["id"],
+                status=BatchItemStatus.UPLOADED,
+                output_url="file:///tmp/low-retention.mp4",
+                render_metadata={
+                    "subtitle_style_label": "Karaoke Sweep",
+                    "subtitle_font_name": "Montserrat ExtraBold",
+                    "gameplay_asset_path": "gameplay/minecraft/minecraft_clip_04.mp4",
+                },
+                script=ScriptDraft(
+                    title="How this workflow is built",
+                    hook="How this workflow is built",
+                    narration_text="Here is how the workflow is built from source ingest through render.",
+                    caption_text="How this workflow is built",
+                    estimated_seconds=25.0,
+                    visual_beats=[],
+                    music_tags=[],
+                    gameplay_tags=[],
+                    source_facts_used=["The workflow runs from ingest to render."],
+                ),
+            )
+        )
+        asyncio.run(
+            repository.update_batch_item(
+                third_item["id"],
+                status=BatchItemStatus.UPLOADED,
+                output_url="file:///tmp/third-retention.mp4",
+                render_metadata={
+                    "subtitle_style_label": "Single Word Pop",
+                    "subtitle_font_name": "Komika Axis",
+                    "gameplay_asset_path": "gameplay/roblox/roblox_clip_10.mp4",
+                },
+                script=ScriptDraft(
+                    title="Why creators keep using this workflow",
+                    hook="Why creators keep using this workflow",
+                    narration_text="Creators keep using this workflow because one source can turn into a repeatable batch of shorts.",
+                    caption_text="Why creators keep using this workflow",
+                    estimated_seconds=24.0,
+                    visual_beats=[],
+                    music_tags=[],
+                    gameplay_tags=[],
+                    source_facts_used=["One source can become a batch of shorts."],
+                ),
+            )
+        )
+        asyncio.run(repository.update_batch(batch_payload["batch"]["id"], status="completed"))
+        asyncio.run(chat_service.refresh_chat_summary(chat_id))
+
+        current_session_id = "page-session-1"
+        for payload in (
+            {
+                "item_id": first_item["id"],
+                "viewer_id": "viewer-a",
+                "session_id": "session-a",
+                "watch_time_seconds": 24.0,
+                "completion_ratio": 0.96,
+                "max_progress_seconds": 24.0,
+                "replay_count": 1,
+                "unmuted": True,
+                "liked": True,
+                "metadata": {"page_session_id": current_session_id},
+            },
+            {
+                "item_id": second_item["id"],
+                "viewer_id": "viewer-b",
+                "session_id": "session-b",
+                "watch_time_seconds": 3.0,
+                "completion_ratio": 0.12,
+                "max_progress_seconds": 3.0,
+                "skipped_early": True,
+                "metadata": {"page_session_id": current_session_id},
+            },
+            {
+                "item_id": third_item["id"],
+                "viewer_id": "viewer-c",
+                "session_id": "session-c",
+                "watch_time_seconds": 21.0,
+                "completion_ratio": 0.875,
+                "max_progress_seconds": 21.0,
+                "info_opened": True,
+                "open_clicked": True,
+                "metadata": {"page_session_id": current_session_id},
+            },
+        ):
+            response = client.post(f"/v1/chats/{chat_id}/engagement", json=payload)
+            assert response.status_code == 200
+
+        stale_response = client.post(
+            f"/v1/chats/{chat_id}/engagement",
+            json={
+                "item_id": second_item["id"],
+                "viewer_id": "viewer-z",
+                "session_id": "session-z",
+                "watch_time_seconds": 19.0,
+                "completion_ratio": 0.79,
+                "max_progress_seconds": 19.0,
+                "metadata": {"page_session_id": "page-session-old"},
+            },
+        )
+        assert stale_response.status_code == 200
+
+        recommendation_response = client.get(
+            f"/v1/chats/{chat_id}/recommendations",
+            params={"session_id": current_session_id},
+        )
+        assert recommendation_response.status_code == 200
+        recommendation = recommendation_response.json()
+
+        assert recommendation["chat_id"] == chat_id
+        assert recommendation["has_enough_data"] is True
+        assert recommendation["total_sessions"] == 3
+        assert recommendation["reels_tracked"] == 3
+        assert recommendation["session_id"] == current_session_id
+        assert recommendation["top_gameplay"][0]["label"] == "Roblox"
+        assert recommendation["top_caption_styles"][0]["label"] == "Single Word Pop · Komika Axis"
+        assert recommendation["top_text_styles"][0]["label"] == "warning-style"
+        retention_by_title = {
+            item["title"]: item["watch_time_seconds"]
+            for item in recommendation["retention_summary"]
+        }
+        assert retention_by_title["The hidden risk in AI agents"] == 24.0
+        assert retention_by_title["How this workflow is built"] == 3.0
+        assert retention_by_title["Why creators keep using this workflow"] == 21.0
+        assert "Roblox" in recommendation["generation_prompt"]

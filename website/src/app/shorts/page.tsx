@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import styles from './shorts-page.module.css'
@@ -61,6 +61,51 @@ type ChatGeneratedAssetsResponse = {
   items: ChatGeneratedAsset[]
 }
 
+type RecommendationInsight = {
+  key: string
+  label: string
+  score: number
+  sample_size: number
+  avg_completion_ratio: number
+  avg_watch_time_seconds: number
+  positive_action_rate: number
+}
+
+type ReelRetentionSummary = {
+  reel_number: number
+  item_id: string
+  title: string
+  watch_time_seconds: number
+  max_progress_seconds: number
+  completion_ratio: number
+  estimated_seconds: number | null
+  replay_count: number
+  subtitle_style: string | null
+  subtitle_font: string | null
+  gameplay_label: string | null
+}
+
+type ChatRecommendationResponse = {
+  chat_id: string
+  chat: ChatSummary | null
+  session_id: string | null
+  has_enough_data: boolean
+  min_reels_required: number
+  reels_tracked: number
+  total_sessions: number
+  total_watch_time_seconds: number
+  unique_viewers: number
+  high_retention_sessions: number
+  recommendation_title: string | null
+  recommendation_body: string | null
+  generation_prompt: string | null
+  top_gameplay: RecommendationInsight[]
+  top_caption_styles: RecommendationInsight[]
+  top_text_styles: RecommendationInsight[]
+  retention_summary: ReelRetentionSummary[]
+  winning_profile: Record<string, unknown>
+}
+
 type GeneratedShort = {
   id: string
   title: string
@@ -77,6 +122,27 @@ type GeneratedShort = {
   gameplayAsset: string | null
 }
 
+type ShortEngagementPayload = {
+  batch_id: string
+  item_id: string
+  viewer_id: string
+  session_id: string
+  watch_time_seconds: number
+  completion_ratio: number
+  max_progress_seconds: number
+  replay_count: number
+  unmuted: boolean
+  info_opened: boolean
+  open_clicked: boolean
+  liked: boolean
+  skipped_early: boolean
+  metadata: Record<string, unknown>
+}
+
+const SHORTS_VIEWER_ID_STORAGE_KEY = 'draftr:viewer-id'
+const INSIGHTS_OPEN_STORAGE_KEY = 'draftr:shorts-insights-open'
+const INSIGHTS_WIDTH_STORAGE_KEY = 'draftr:shorts-insights-width'
+
 // ─── Page root ───────────────────────────────────────────────────────────────
 
 export default function ShortsPage() {
@@ -91,8 +157,11 @@ function ShortsPageFallback() {
   return (
     <ShortsShell
       chats={[]} selectedChat={null} selectedChatId={null}
+      recommendation={null}
       shorts={[]} libraryState="loading" shortsState="idle"
       error={null} onSelectChat={() => {}}
+      sessionScopeId={null}
+      onRetentionUpdate={() => {}}
     />
   )
 }
@@ -108,6 +177,9 @@ function ShortsPageContent() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(requestedChatId)
   const [selectedChat, setSelectedChat] = useState<ChatSummary | null>(null)
   const [shorts, setShorts] = useState<GeneratedShort[]>([])
+  const [recommendation, setRecommendation] = useState<ChatRecommendationResponse | null>(null)
+  const [recommendationSession, setRecommendationSession] = useState<{ chatId: string; id: string } | null>(null)
+  const [recommendationVersion, setRecommendationVersion] = useState(0)
   const [libraryState, setLibraryState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [shortsState, setShortsState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -176,10 +248,23 @@ function ShortsPageContent() {
     if (libraryState === 'loading') return
     const fallback = chats[0]?.id ?? null
     const next = requestedChatId || fallback
-    if (!next) { setSelectedChatId(null); setSelectedChat(null); setShorts([]); return }
+    if (!next) { setSelectedChatId(null); setSelectedChat(null); setShorts([]); setRecommendation(null); return }
     if (next !== selectedChatId) setSelectedChatId(next)
     if (!requestedChatId && fallback) router.replace(buildChatShortsPath(fallback), { scroll: false })
   }, [chats, libraryState, requestedChatId, router, selectedChatId])
+
+  useEffect(() => {
+    if (!selectedChatId) {
+      setRecommendationSession(null)
+      setSelectedChat(null)
+      setShorts([])
+      setRecommendation(null)
+      setShortsState('idle')
+      return
+    }
+    setRecommendationSession({ chatId: selectedChatId, id: crypto.randomUUID() })
+    setRecommendationVersion(0)
+  }, [selectedChatId])
 
   useEffect(() => {
     if (!selectedChatId) { setSelectedChat(null); setShorts([]); setShortsState('idle'); return }
@@ -205,6 +290,7 @@ function ShortsPageContent() {
       } catch (err) {
         if (ac.signal.aborted) return
         setShorts(loadChatShorts(id).map(mapStoredToShort))
+        setRecommendation(null)
         setShortsState('error')
         setError(err instanceof Error ? err.message : 'Failed to load shorts.')
       }
@@ -213,11 +299,43 @@ function ShortsPageContent() {
     return () => ac.abort()
   }, [selectedChatId])
 
+  useEffect(() => {
+    if (!selectedChatId || !recommendationSession || recommendationSession.chatId !== selectedChatId) {
+      setRecommendation(null)
+      return
+    }
+
+    const chatId = selectedChatId
+    const sessionScopeId = recommendationSession.id
+    const ac = new AbortController()
+    async function loadRecommendation() {
+      try {
+        const url = `/api/brainrot/chats/${encodeURIComponent(chatId)}/recommendations?session_id=${encodeURIComponent(sessionScopeId)}`
+        const response = await fetch(url, { cache: 'no-store', signal: ac.signal })
+        const payload = (await response.json()) as ChatRecommendationResponse & { detail?: string }
+        if (!response.ok) throw new Error(payload.detail ?? 'Failed to load recommendations.')
+        if (!ac.signal.aborted) {
+          setRecommendation(payload)
+        }
+      } catch (err) {
+        if (ac.signal.aborted) return
+        setRecommendation(null)
+        setError(err instanceof Error ? err.message : 'Failed to load recommendations.')
+      }
+    }
+
+    void loadRecommendation()
+    return () => ac.abort()
+  }, [selectedChatId, recommendationSession, recommendationVersion])
+
   return (
     <ShortsShell
       chats={chats} selectedChat={selectedChat} selectedChatId={selectedChatId}
+      recommendation={recommendation}
       shorts={shorts} libraryState={libraryState} shortsState={shortsState}
       error={error} onSelectChat={(id) => { setSelectedChatId(id); router.replace(buildChatShortsPath(id), { scroll: false }) }}
+      sessionScopeId={recommendationSession?.chatId === selectedChatId ? recommendationSession.id : null}
+      onRetentionUpdate={() => setRecommendationVersion(value => value + 1)}
     />
   )
 }
@@ -225,25 +343,95 @@ function ShortsPageContent() {
 // ─── Shell layout ─────────────────────────────────────────────────────────────
 
 function ShortsShell({
-  chats, selectedChat, selectedChatId, shorts,
-  libraryState, shortsState, error, onSelectChat,
+  chats, selectedChat, selectedChatId, recommendation, shorts,
+  libraryState, shortsState, error, onSelectChat, sessionScopeId, onRetentionUpdate,
 }: {
   chats: ChatSummary[]
   selectedChat: ChatSummary | null
   selectedChatId: string | null
+  recommendation: ChatRecommendationResponse | null
   shorts: GeneratedShort[]
   libraryState: 'loading' | 'ready' | 'error'
   shortsState: 'idle' | 'loading' | 'ready' | 'error'
   error: string | null
   onSelectChat: (id: string) => void
+  sessionScopeId: string | null
+  onRetentionUpdate: () => void
 }) {
   const exportSummary = selectedChat ? formatExportSummary(selectedChat) : null
   const updatedTime   = selectedChat ? formatRelTime(selectedChat.updated_at) : null
   const hasFeed = Boolean(selectedChat && shorts.length > 0)
   const isSwitchingChat = Boolean(selectedChat && shorts.length > 0 && shortsState === 'loading')
+  const [insightsOpen, setInsightsOpen] = useState(true)
+  const [insightsWidth, setInsightsWidth] = useState(380)
+  const [isResizing, setIsResizing] = useState(false)
+  const resizeStateRef = useRef<{ startX: number; startWidth: number } | null>(null)
+  const showRecommendationRail = Boolean(selectedChat && recommendation && insightsOpen)
+  const canRenderRecommendation = Boolean(selectedChat && recommendation)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const storedOpen = window.localStorage.getItem(INSIGHTS_OPEN_STORAGE_KEY)
+    const storedWidth = window.localStorage.getItem(INSIGHTS_WIDTH_STORAGE_KEY)
+    if (storedOpen != null) {
+      setInsightsOpen(storedOpen !== '0')
+    }
+    if (storedWidth != null) {
+      const parsed = Number(storedWidth)
+      if (Number.isFinite(parsed)) {
+        setInsightsWidth(clampInsightsWidth(parsed))
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(INSIGHTS_OPEN_STORAGE_KEY, insightsOpen ? '1' : '0')
+  }, [insightsOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.localStorage.setItem(INSIGHTS_WIDTH_STORAGE_KEY, String(insightsWidth))
+  }, [insightsWidth])
+
+  useEffect(() => {
+    if (!isResizing) return
+
+    function handlePointerMove(event: PointerEvent) {
+      const state = resizeStateRef.current
+      if (!state) return
+      const delta = state.startX - event.clientX
+      setInsightsWidth(clampInsightsWidth(state.startWidth + delta))
+    }
+
+    function handlePointerUp() {
+      resizeStateRef.current = null
+      setIsResizing(false)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+    }
+  }, [isResizing])
+
+  const stageGridStyle = useMemo(
+    () => ({
+      ['--insights-width' as string]: `${insightsWidth}px`,
+    }),
+    [insightsWidth],
+  )
+
+  function startResize(event: React.PointerEvent<HTMLButtonElement>) {
+    resizeStateRef.current = { startX: event.clientX, startWidth: insightsWidth }
+    setIsResizing(true)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
 
   return (
-    <div className={styles.root}>
+    <div className={`${styles.root} ${isResizing ? styles.rootResizing : ''}`}>
       <Navbar />
 
       <div className={styles.libraryLayout}>
@@ -316,11 +504,66 @@ function ShortsShell({
           <div className={styles.mainCanvas}>
             {hasFeed ? (
               <div
-                key={selectedChat?.id ?? selectedChatId ?? 'shorts-feed'}
-                className={`${styles.feedViewport} ${isSwitchingChat ? styles.feedViewportSwitching : styles.feedViewportReady}`}
+                className={`${styles.stageGrid} ${showRecommendationRail ? styles.stageGridWithRail : ''}`}
+                style={showRecommendationRail ? stageGridStyle : undefined}
               >
-                <ShortsFeed shorts={shorts} />
+                <div className={styles.feedColumn}>
+                  <div
+                    key={selectedChat?.id ?? selectedChatId ?? 'shorts-feed'}
+                    className={`${styles.feedViewport} ${isSwitchingChat ? styles.feedViewportSwitching : styles.feedViewportReady}`}
+                  >
+                    <ShortsFeed
+                      chatId={selectedChat?.id ?? selectedChatId ?? ''}
+                      shorts={shorts}
+                      sessionScopeId={sessionScopeId}
+                      onRetentionUpdate={onRetentionUpdate}
+                    />
+                  </div>
+                </div>
+
+                {showRecommendationRail && selectedChat && recommendation ? (
+                  <>
+                    <button
+                      type="button"
+                      className={styles.recommendationRailHandle}
+                      aria-label="Resize recommendation sidebar"
+                      aria-orientation="vertical"
+                      onPointerDown={startResize}
+                    >
+                      <span />
+                    </button>
+
+                    <aside className={styles.recommendationRail}>
+                      <div className={styles.recommendationRailHeader}>
+                        <div>
+                          <p className={styles.recommendationRailEyebrow}>Insights</p>
+                          <h3 className={styles.recommendationRailTitle}>Recommendation system</h3>
+                        </div>
+                        <button
+                          type="button"
+                          className={styles.recommendationRailToggle}
+                          onClick={() => setInsightsOpen(false)}
+                        >
+                          Hide
+                        </button>
+                      </div>
+
+                      <RecommendationCard chatId={selectedChat.id} recommendation={recommendation} />
+                    </aside>
+                  </>
+                ) : null}
               </div>
+            ) : null}
+
+            {!showRecommendationRail && canRenderRecommendation ? (
+              <button
+                type="button"
+                className={styles.recommendationDockButton}
+                onClick={() => setInsightsOpen(true)}
+              >
+                <span className={styles.recommendationDockEyebrow}>Insights</span>
+                <span className={styles.recommendationDockTitle}>Open recommendation sidebar</span>
+              </button>
             ) : null}
 
             {isSwitchingChat ? (
@@ -368,81 +611,215 @@ function ShortsShell({
   )
 }
 
+function RecommendationCard({
+  chatId,
+  recommendation,
+}: {
+  chatId: string
+  recommendation: ChatRecommendationResponse
+}) {
+  const topGameplay = recommendation.top_gameplay[0]?.label ?? 'mixed gameplay'
+  const topCaptions = recommendation.top_caption_styles[0]?.label ?? 'the current caption mix'
+  const topTextStyle = recommendation.top_text_styles[0]?.label ?? 'the current hooks'
+  const reelsRemaining = Math.max(0, recommendation.min_reels_required - recommendation.reels_tracked)
+  const prompt = recommendation.generation_prompt
+  const chatHref = prompt
+    ? `/chat?chat=${encodeURIComponent(chatId)}&prefill=${encodeURIComponent(prompt)}`
+    : `/chat?chat=${encodeURIComponent(chatId)}`
+  const compactCopy = recommendation.has_enough_data
+    ? `This session is leaning toward ${topGameplay} gameplay, ${topCaptions} captions, and ${topTextStyle} hooks.`
+    : `This session has ${recommendation.reels_tracked} tracked reel${recommendation.reels_tracked === 1 ? '' : 's'}. Watch ${reelsRemaining} more to unlock a stronger recommendation.`
+
+  return (
+    <section className={styles.recommendationCard}>
+      <div className={styles.recommendationHeader}>
+        <p className={styles.recommendationKicker}>
+          {recommendation.has_enough_data ? 'Best signal right now' : 'Retention is warming up'}
+        </p>
+        <h3 className={styles.recommendationTitle}>
+          {recommendation.recommendation_title ?? 'Retention insights are warming up'}
+        </h3>
+        <p className={styles.recommendationCopy}>{compactCopy}</p>
+      </div>
+
+      <div className={styles.recommendationStats}>
+        <div className={styles.recommendationStat}>
+          <span className={styles.recommendationStatValue}>{recommendation.reels_tracked}</span>
+          <span className={styles.recommendationStatLabel}>reels tracked</span>
+        </div>
+        <div className={styles.recommendationStat}>
+          <span className={styles.recommendationStatValue}>{formatSeconds(recommendation.total_watch_time_seconds)}</span>
+          <span className={styles.recommendationStatLabel}>watched</span>
+        </div>
+        <div className={styles.recommendationStat}>
+          <span className={styles.recommendationStatValue}>{recommendation.high_retention_sessions}</span>
+          <span className={styles.recommendationStatLabel}>high-retention</span>
+        </div>
+      </div>
+
+      <div className={styles.recommendationSignals}>
+        <SignalRow label="Gameplay" value={topGameplay} />
+        <SignalRow label="Captions" value={topCaptions} />
+        <SignalRow label="Text style" value={topTextStyle} />
+      </div>
+
+      <div className={styles.retentionSummaryBlock}>
+        <div className={styles.retentionSummaryHeader}>
+          <p className={styles.retentionSummaryTitle}>Current session retention summary</p>
+          <p className={styles.retentionSummaryCopy}>
+            {recommendation.has_enough_data
+              ? 'Session-level retention by reel.'
+              : `Watch at least ${recommendation.min_reels_required} reels in one session to unlock a recommendation.`}
+          </p>
+        </div>
+
+        {recommendation.retention_summary.length > 0 ? (
+          <div className={styles.retentionSummaryList}>
+            {recommendation.retention_summary.map(summary => (
+              <div key={summary.item_id} className={styles.retentionSummaryRow}>
+                <div className={styles.retentionSummaryRowTop}>
+                  <span className={styles.retentionSummaryIndex}>Reel {summary.reel_number}</span>
+                  <span className={styles.retentionSummaryMetric}>{Math.round(summary.completion_ratio * 100)}%</span>
+                </div>
+                <div className={styles.retentionSummaryMeta}>
+                  <p className={styles.retentionSummaryRowTitle}>{summary.title}</p>
+                  <p className={styles.retentionSummaryRowCopy}>
+                    Watched {formatSeconds(summary.watch_time_seconds)}
+                    {summary.estimated_seconds ? ` of ${formatSeconds(summary.estimated_seconds)}` : ''}
+                    {' '}• peak {formatSeconds(summary.max_progress_seconds)}
+                  </p>
+                </div>
+                <div className={styles.retentionSummaryTags}>
+                  {summary.gameplay_label ? <span>{summary.gameplay_label}</span> : null}
+                  {summary.subtitle_style ? <span>{summary.subtitle_style}</span> : null}
+                  {summary.subtitle_font ? <span>{summary.subtitle_font}</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={styles.retentionSummaryEmpty}>
+            Start watching reels in this chat and Draftr will show exactly how many seconds each one held attention.
+          </div>
+        )}
+      </div>
+
+      <div className={styles.recommendationFooter}>
+        <p className={styles.recommendationFootnote}>
+          Based only on this current viewing session, using watch time, completion, replays, likes, info opens, and open actions.
+        </p>
+        {prompt ? (
+          <Link href={chatHref} className={styles.recommendationLink}>
+            Generate more like this
+          </Link>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+function SignalRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.recommendationSignal}>
+      <span className={styles.recommendationSignalLabel}>{label}</span>
+      <strong className={styles.recommendationSignalValue}>{value}</strong>
+    </div>
+  )
+}
+
 // ─── Shorts feed — owns all scroll/play logic ────────────────────────────────
 
-function ShortsFeed({ shorts }: { shorts: GeneratedShort[] }) {
-  const feedRef = useRef<HTMLDivElement>(null)
+function ShortsFeed({
+  chatId,
+  shorts,
+  sessionScopeId,
+  onRetentionUpdate,
+}: {
+  chatId: string
+  shorts: GeneratedShort[]
+  sessionScopeId: string | null
+  onRetentionUpdate: () => void
+}) {
   const [activeIndex, setActiveIndex] = useState(0)
   // Shared mute state across all slides — once user unmutes, all subsequent slides stay unmuted
   const [globalMuted, setGlobalMuted] = useState(false)
-  const isScrolling = useRef(false)
-  const cooldown = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [viewerId] = useState(() => getOrCreateViewerId())
+  const lockedRef = useRef(false)
+  const touchStartRef = useRef(0)
 
-  // ── Wheel hijack: one video per scroll event, absorb momentum ──────────────
   useEffect(() => {
-    const el = feedRef.current
-    if (!el) return
+    setActiveIndex(0)
+    lockedRef.current = false
+  }, [chatId, shorts.length])
 
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      if (isScrolling.current) return   // absorb momentum / repeated events
+  function go(direction: 1 | -1) {
+    if (lockedRef.current) return
+    setActiveIndex(previous => {
+      const next = Math.max(0, Math.min(shorts.length - 1, previous + direction))
+      if (next === previous) return previous
+      lockedRef.current = true
+      window.setTimeout(() => {
+        lockedRef.current = false
+      }, 720)
+      return next
+    })
+  }
 
-      const dir = e.deltaY > 0 ? 1 : -1
+  function handleWheel(event: React.WheelEvent<HTMLDivElement>) {
+    event.preventDefault()
+    go(event.deltaY > 0 ? 1 : -1)
+  }
 
-      isScrolling.current = true
-
-      setActiveIndex(prev => {
-        const next = Math.max(0, Math.min(shorts.length - 1, prev + dir))
-        el.scrollTo({ top: next * el.clientHeight, behavior: 'smooth' })
-        return next
-      })
-
-      if (cooldown.current) clearTimeout(cooldown.current)
-      cooldown.current = setTimeout(() => { isScrolling.current = false }, 800)
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+      event.preventDefault()
+      go(1)
     }
-
-    // passive: false is required to call e.preventDefault()
-    el.addEventListener('wheel', handleWheel, { passive: false })
-    return () => {
-      el.removeEventListener('wheel', handleWheel)
-      if (cooldown.current) clearTimeout(cooldown.current)
+    if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+      event.preventDefault()
+      go(-1)
     }
-  }, [shorts.length])
+  }
 
-  // ── IntersectionObserver: sync activeIndex for touch/swipe ────────────────
-  useEffect(() => {
-    const el = feedRef.current
-    if (!el || shorts.length === 0) return
+  function handleTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    touchStartRef.current = event.touches[0]?.clientY ?? 0
+  }
 
-    const observer = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            const idx = Number((entry.target as HTMLElement).dataset.idx)
-            setActiveIndex(idx)
-          }
-        }
-      },
-      { root: el, threshold: 0.75 }
-    )
-
-    const slides = el.querySelectorAll('[data-idx]')
-    slides.forEach(s => observer.observe(s))
-    return () => observer.disconnect()
-  }, [shorts.length])
+  function handleTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const delta = touchStartRef.current - (event.changedTouches[0]?.clientY ?? 0)
+    if (Math.abs(delta) > 40) {
+      go(delta > 0 ? 1 : -1)
+    }
+  }
 
   return (
-    <div className={styles.feed} ref={feedRef}>
+    <div
+      className={styles.feed}
+      onWheel={handleWheel}
+      onKeyDown={handleKeyDown}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      tabIndex={0}
+    >
       {shorts.map((short, index) => (
-        <div key={short.id} className={styles.slide} data-idx={index}>
+        <div
+          key={short.id}
+          className={`${styles.slide} ${index === activeIndex ? styles.slideActive : styles.slideInactive}`}
+          style={{ transform: `translateY(${(index - activeIndex) * 100}%)` }}
+          data-idx={index}
+        >
           <ShortSlide
+            chatId={chatId}
             short={short}
             index={index}
             total={shorts.length}
             isActive={index === activeIndex}
             shouldPrime={Math.abs(index - activeIndex) <= 1}
+            viewerId={viewerId}
             globalMuted={globalMuted}
             onMuteChange={setGlobalMuted}
+            sessionScopeId={sessionScopeId}
+            onRetentionUpdate={onRetentionUpdate}
           />
         </div>
       ))}
@@ -453,15 +830,20 @@ function ShortsFeed({ shorts }: { shorts: GeneratedShort[] }) {
 // ─── Individual short card ────────────────────────────────────────────────────
 
 function ShortSlide({
-  short, index, total, isActive, shouldPrime, globalMuted, onMuteChange,
+  chatId, short, index, total, isActive, shouldPrime, viewerId, globalMuted, onMuteChange,
+  sessionScopeId, onRetentionUpdate,
 }: {
+  chatId: string
   short: GeneratedShort
   index: number
   total: number
   isActive: boolean
   shouldPrime: boolean
+  viewerId: string
   globalMuted: boolean
   onMuteChange: (muted: boolean) => void
+  sessionScopeId: string | null
+  onRetentionUpdate: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [isPaused, setIsPaused] = useState(false)
@@ -469,10 +851,23 @@ function ShortSlide({
   const [hasLoadedFrame, setHasLoadedFrame] = useState(false)
   const [animateIn, setAnimateIn] = useState(false)
   const [showInfo, setShowInfo] = useState(false)
+  const [isLiked, setIsLiked] = useState(false)
+
+  const sessionIdRef = useRef<string | null>(null)
+  const playStartedAtRef = useRef<number | null>(null)
+  const watchTimeRef = useRef(0)
+  const maxProgressRef = useRef(0)
+  const replayCountRef = useRef(0)
+  const heardAudioRef = useRef(false)
+  const infoOpenedRef = useRef(false)
+  const openClickedRef = useRef(false)
+  const likedRef = useRef(false)
+  const submittedRef = useRef(false)
 
   useEffect(() => {
     setIsBuffering(shouldPrime)
     setHasLoadedFrame(false)
+    setIsLiked(false)
   }, [short.videoUrl, shouldPrime])
 
   // Replay entrance animations each time this slide becomes active
@@ -511,6 +906,111 @@ function ShortSlide({
     v.muted = globalMuted
   }, [globalMuted])
 
+  function startSession() {
+    sessionIdRef.current = crypto.randomUUID()
+    playStartedAtRef.current = null
+    watchTimeRef.current = 0
+    maxProgressRef.current = 0
+    replayCountRef.current = 0
+    heardAudioRef.current = false
+    infoOpenedRef.current = false
+    openClickedRef.current = false
+    likedRef.current = false
+    submittedRef.current = false
+  }
+
+  function accumulateWatchTime() {
+    if (playStartedAtRef.current == null) {
+      return
+    }
+    watchTimeRef.current += Math.max(0, (performance.now() - playStartedAtRef.current) / 1000)
+    playStartedAtRef.current = null
+  }
+
+  function buildEngagementPayload(): ShortEngagementPayload | null {
+    const sessionId = sessionIdRef.current
+    if (!sessionId) {
+      return null
+    }
+
+    const duration = Number.isFinite(videoRef.current?.duration) && (videoRef.current?.duration ?? 0) > 0
+      ? Number(videoRef.current?.duration)
+      : short.estimatedSeconds ?? Math.max(maxProgressRef.current, 1)
+    const watchTimeSeconds = Number(watchTimeRef.current.toFixed(3))
+    const maxProgressSeconds = Number(maxProgressRef.current.toFixed(3))
+    const completionRatio = Number((Math.max(maxProgressSeconds, watchTimeSeconds) / Math.max(duration, 1)).toFixed(4))
+    const skippedEarly =
+      watchTimeSeconds < Math.min(3.0, duration * 0.18) &&
+      completionRatio < 0.2 &&
+      !infoOpenedRef.current &&
+      !openClickedRef.current &&
+      !likedRef.current
+
+    if (watchTimeSeconds < 0.35 && !infoOpenedRef.current && !openClickedRef.current && !likedRef.current) {
+      return null
+    }
+
+    return {
+      batch_id: short.batchId,
+      item_id: short.itemId,
+      viewer_id: viewerId,
+      session_id: sessionId,
+      watch_time_seconds: watchTimeSeconds,
+      completion_ratio: completionRatio,
+      max_progress_seconds: maxProgressSeconds,
+      replay_count: replayCountRef.current,
+      unmuted: heardAudioRef.current,
+      info_opened: infoOpenedRef.current,
+      open_clicked: openClickedRef.current,
+      liked: likedRef.current,
+      skipped_early: skippedEarly,
+      metadata: {
+        page_session_id: sessionScopeId,
+        subtitle_style: short.subtitleStyle,
+        subtitle_font: short.subtitleFont,
+        gameplay_asset: short.gameplayAsset,
+      },
+    }
+  }
+
+  function flushSession(useBeacon = false) {
+    if (submittedRef.current) {
+      return
+    }
+    accumulateWatchTime()
+    const payload = buildEngagementPayload()
+    if (!payload) {
+      submittedRef.current = true
+      return
+    }
+    submittedRef.current = true
+    void submitShortEngagement(chatId, payload, useBeacon).then(recorded => {
+      if (recorded && !useBeacon) {
+        onRetentionUpdate()
+      }
+    })
+  }
+
+  useEffect(() => {
+    if (!isActive) {
+      return
+    }
+    startSession()
+    return () => {
+      flushSession(false)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, short.id])
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      flushSession(true)
+    }
+    window.addEventListener('pagehide', handlePageHide)
+    return () => window.removeEventListener('pagehide', handlePageHide)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId, short.id, viewerId])
+
   // Play/pause + restart when this card becomes active
   useEffect(() => {
     const v = videoRef.current
@@ -535,7 +1035,7 @@ function ShortSlide({
     const v = videoRef.current
     if (!v) return
     if (v.paused) { v.play().catch(() => {}); setIsPaused(false) }
-    else          { v.pause(); setIsPaused(true) }
+    else          { v.pause(); setIsPaused(true); accumulateWatchTime() }
   }
 
   function toggleMute(e: React.MouseEvent) {
@@ -545,6 +1045,34 @@ function ShortSlide({
     const next = !v.muted
     v.muted = next
     onMuteChange(next)
+    if (!next) {
+      heardAudioRef.current = true
+    }
+  }
+
+  function toggleLike(e: React.MouseEvent) {
+    e.stopPropagation()
+    setIsLiked(previous => {
+      const next = !previous
+      likedRef.current = next
+      return next
+    })
+  }
+
+  function toggleInfo(e: React.MouseEvent) {
+    e.stopPropagation()
+    setShowInfo(previous => {
+      const next = !previous
+      if (next) {
+        infoOpenedRef.current = true
+      }
+      return next
+    })
+  }
+
+  function handleOpenClick() {
+    openClickedRef.current = true
+    flushSession(false)
   }
 
   return (
@@ -571,9 +1099,22 @@ function ShortSlide({
           onPlaying={() => {
             setHasLoadedFrame(true)
             setIsBuffering(false)
+            if (playStartedAtRef.current == null) {
+              playStartedAtRef.current = performance.now()
+            }
           }}
           onWaiting={() => {
+            accumulateWatchTime()
             if (isActive) setIsBuffering(true)
+          }}
+          onPause={() => accumulateWatchTime()}
+          onTimeUpdate={() => {
+            const currentTime = videoRef.current?.currentTime ?? 0
+            maxProgressRef.current = Math.max(maxProgressRef.current, currentTime)
+          }}
+          onEnded={() => {
+            replayCountRef.current += 1
+            accumulateWatchTime()
           }}
         />
 
@@ -674,8 +1215,8 @@ function ShortSlide({
 
       {/* ── Right action column ── */}
       <div className={`${styles.shortActions} ${animateIn ? styles.shortActionsAnimate : ''}`}>
-        <button type="button" className={styles.shortActionBtn} aria-label="Like">
-          <div className={styles.shortActionIcon}>
+        <button type="button" className={styles.shortActionBtn} aria-label="Like" onClick={toggleLike}>
+          <div className={`${styles.shortActionIcon} ${isLiked ? styles.shortActionIconActive : ''}`}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
             </svg>
@@ -683,7 +1224,14 @@ function ShortSlide({
           <span className={styles.shortActionLabel}>Like</span>
         </button>
 
-        <a href={short.videoUrl} target="_blank" rel="noreferrer" className={styles.shortActionBtn} aria-label="Open">
+        <a
+          href={short.videoUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={styles.shortActionBtn}
+          aria-label="Open"
+          onClick={handleOpenClick}
+        >
           <div className={styles.shortActionIcon}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
@@ -693,7 +1241,7 @@ function ShortSlide({
           <span className={styles.shortActionLabel}>Open</span>
         </a>
 
-        <button type="button" className={styles.shortActionBtn} aria-label="Info" onClick={(e) => { e.stopPropagation(); setShowInfo(v => !v) }}>
+        <button type="button" className={styles.shortActionBtn} aria-label="Info" onClick={toggleInfo}>
           <div className={`${styles.shortActionIcon} ${showInfo ? styles.shortActionIconActive : ''}`}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -852,4 +1400,66 @@ function formatRelTime(value: string): string {
   const h = Math.floor(m / 60)
   if (h < 24) return `${h}h ago`
   return `${Math.floor(h / 24)}d ago`
+}
+
+function formatSeconds(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0.0s'
+  }
+  return `${value.toFixed(1)}s`
+}
+
+function clampInsightsWidth(value: number): number {
+  return Math.max(320, Math.min(520, Math.round(value)))
+}
+
+function getOrCreateViewerId(): string {
+  if (typeof window === 'undefined') {
+    return 'server-viewer'
+  }
+
+  const existing = window.localStorage.getItem(SHORTS_VIEWER_ID_STORAGE_KEY)
+  if (existing) {
+    return existing
+  }
+
+  const created = crypto.randomUUID()
+  window.localStorage.setItem(SHORTS_VIEWER_ID_STORAGE_KEY, created)
+  return created
+}
+
+async function submitShortEngagement(
+  chatId: string,
+  payload: ShortEngagementPayload,
+  useBeacon: boolean,
+): Promise<boolean> {
+  const url = `/api/brainrot/chats/${encodeURIComponent(chatId)}/engagement`
+  const body = JSON.stringify(payload)
+
+  if (useBeacon && typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+    try {
+      const beaconPayload = new Blob([body], { type: 'application/json' })
+      if (navigator.sendBeacon(url, beaconPayload)) {
+        return true
+      }
+    } catch {
+      // Fall back to fetch below.
+    }
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body,
+      keepalive: useBeacon,
+      cache: 'no-store',
+    })
+    return response.ok
+  } catch {
+    // Engagement capture is best-effort.
+    return false
+  }
 }

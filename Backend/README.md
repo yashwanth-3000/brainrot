@@ -1,8 +1,49 @@
 # Backend
 
-The FastAPI service that drives the full video generation pipeline. It ingests content through **Firecrawl**, generates narration scripts via **ElevenLabs Producer agent** (backed by OpenAI), narrates each script with the **ElevenLabs Narrator agent**, extracts word-level timings via **ElevenLabs Forced Alignment**, and composes the final 1080x1920 H.264 video with **FFmpeg**. Progress streams to the frontend over **SSE** at every stage.
+The FastAPI service that drives Draftr. It has two backend domains:
+
+- `video_generator`: source ingest, scripting, narration, subtitle timing, asset selection, and FFmpeg render
+- `recommendation_system`: chat library, reel retention tracking, and recommendation scoring
+
+The live video pipeline ingests content through **Firecrawl**, generates narration scripts through **OpenAI**, narrates each script with the **ElevenLabs Narrator agent**, extracts word-level timings with **ElevenLabs Forced Alignment**, and composes the final 1080x1920 H.264 video with **FFmpeg**. Progress streams to the frontend over **SSE** at every stage.
 
 In development the service runs entirely without external infrastructure — it uses an in-memory repository and writes rendered videos to `data/` on local disk. Switching to Supabase for production requires only adding three env vars.
+
+## Folder layout
+
+```text
+Backend/
+├── brainrot_backend/
+│   ├── config.py
+│   ├── container.py
+│   ├── main.py
+│   ├── recommendation_system/
+│   │   ├── routes.py
+│   │   └── service.py
+│   ├── shared/
+│   │   ├── models/
+│   │   └── storage/
+│   └── video_generator/
+│       ├── integrations/
+│       ├── render/
+│       ├── routes/
+│       ├── services/
+│       └── workers/
+├── scripts/
+├── sql/
+├── supabase/
+└── tests/
+```
+
+### What goes where
+
+- `brainrot_backend/main.py`: FastAPI app wiring and router registration
+- `brainrot_backend/container.py`: dependency container and infrastructure composition
+- `brainrot_backend/shared/models`: shared API and domain models
+- `brainrot_backend/shared/storage`: in-memory and Supabase repositories/blob storage
+- `brainrot_backend/video_generator`: all code required to turn source material into rendered vertical videos
+- `brainrot_backend/recommendation_system`: all code required to track reel engagement and recommend follow-up generations
+- `tests/`: backend test coverage, split across pipeline, integrations, subtitles, and API behavior
 
 ## Stack
 
@@ -11,7 +52,7 @@ In development the service runs entirely without external infrastructure — it 
 | HTTP framework | FastAPI, Uvicorn, asyncio |
 | Language | Python 3.12+ |
 | Package manager | UV |
-| Script generation | ElevenLabs Producer agent, OpenAI GPT via custom LLM proxy |
+| Script generation | OpenAI GPT |
 | TTS + alignment | ElevenLabs Narrator agent, ElevenLabs Forced Alignment API |
 | Content ingestion | Firecrawl (URL scraping, PDF parsing) |
 | Video render | FFmpeg (H.264 + AAC, 1080x1920) |
