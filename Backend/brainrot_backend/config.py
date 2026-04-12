@@ -17,6 +17,7 @@ class Settings(BaseSettings):
         env_prefix="BRAINROT_",
         extra="ignore",
         case_sensitive=False,
+        env_ignore_empty=True,
     )
 
     app_name: str = "Brainrot Reel Backend"
@@ -30,8 +31,8 @@ class Settings(BaseSettings):
     temp_dir: Path = Field(default_factory=lambda: _project_root() / "data" / "tmp")
 
     openai_api_key: str | None = None
-    openai_model: str = "gpt-5"
-    openai_reasoning_effort: str = "medium"
+    openai_model: str = "gpt-5.4-mini"
+    openai_reasoning_effort: str = "low"
     openai_base_url: str = "https://api.openai.com/v1"
 
     firecrawl_api_key: str | None = None
@@ -48,13 +49,16 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str | None = None
     elevenlabs_base_url: str = "https://api.elevenlabs.io"
     default_elevenlabs_voice_id: str | None = None
+    narrator_voice_ids_csv: str = ""
     elevenlabs_model_id: str = "eleven_flash_v2"
+    elevenlabs_tts_output_format: str = "mp3_44100_128"
     elevenlabs_tool_token: str | None = None
     elevenlabs_custom_llm_token: str | None = None
     elevenlabs_webhook_secret: str | None = None
     producer_agent_name: str = "Brainrot Producer Agent"
     narrator_agent_name: str = "Brainrot Narrator Agent"
     producer_mode: Literal["direct_openai", "elevenlabs_native"] = "direct_openai"
+    narration_mode: Literal["elevenlabs_tts", "elevenlabs_agent"] = "elevenlabs_tts"
     producer_elevenlabs_model: str | None = None
     producer_timeout_seconds: int = 180
     narrator_timeout_seconds: int = 120
@@ -74,6 +78,7 @@ class Settings(BaseSettings):
     producer_chunk_size: int = 1
     producer_chunk_concurrency: int = 4
 
+    storage_backend: Literal["auto", "supabase", "memory"] = "auto"
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_public_url: str | None = None
@@ -100,6 +105,14 @@ class Settings(BaseSettings):
         return bool(self.supabase_url and self.supabase_service_role_key)
 
     @property
+    def resolved_storage_backend(self) -> Literal["supabase", "memory"]:
+        if self.storage_backend == "supabase":
+            return "supabase"
+        if self.storage_backend == "memory":
+            return "memory"
+        return "supabase" if self.supabase_enabled else "memory"
+
+    @property
     def firecrawl_enabled(self) -> bool:
         return bool(self.firecrawl_api_key)
 
@@ -114,6 +127,20 @@ class Settings(BaseSettings):
             for part in self.allowed_gameplay_games_csv.split(",")
             if part.strip()
         )
+
+    @property
+    def narrator_voice_ids(self) -> tuple[str, ...]:
+        configured = [
+            part.strip()
+            for part in self.narrator_voice_ids_csv.split(",")
+            if part.strip()
+        ]
+        ordered = [
+            voice_id
+            for voice_id in [self.default_elevenlabs_voice_id, *configured]
+            if voice_id
+        ]
+        return tuple(dict.fromkeys(ordered))
 
     def ensure_directories(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)

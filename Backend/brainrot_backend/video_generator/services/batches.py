@@ -53,8 +53,8 @@ class BatchService:
         uploaded_bytes: bytes | None = None,
         uploaded_content_type: str | None = None,
     ) -> BatchEnvelope:
-        producer_config = await self._resolve_agent_config_id(AgentRole.PRODUCER, producer_agent_config_id)
-        narrator_config = await self._resolve_agent_config_id(AgentRole.NARRATOR, narrator_agent_config_id)
+        producer_config = await self._resolve_producer_config_id(producer_agent_config_id)
+        narrator_config = await self._resolve_narrator_config_id(narrator_agent_config_id)
 
         metadata: dict[str, object] = {}
         if uploaded_bytes is not None and uploaded_filename is not None:
@@ -144,7 +144,7 @@ class BatchService:
         music_asset_id: str | None = None,
         narrator_agent_config_id: str | None = None,
     ) -> BatchEnvelope:
-        narrator_config = await self._resolve_agent_config_id(AgentRole.NARRATOR, narrator_agent_config_id)
+        narrator_config = await self._resolve_narrator_config_id(narrator_agent_config_id)
 
         batch = BatchRecord(
             source_kind=SourceKind.ARTICLE,
@@ -219,6 +219,16 @@ class BatchService:
         if config is None:
             raise RuntimeError(f"No active {role.value} agent config exists. Bootstrap ElevenLabs agents first.")
         return config.id
+
+    async def _resolve_producer_config_id(self, requested_id: str | None) -> str | None:
+        if self.settings.producer_mode == "direct_openai":
+            return None
+        return await self._resolve_agent_config_id(AgentRole.PRODUCER, requested_id)
+
+    async def _resolve_narrator_config_id(self, requested_id: str | None) -> str | None:
+        if self.settings.narration_mode == "elevenlabs_tts":
+            return None
+        return await self._resolve_agent_config_id(AgentRole.NARRATOR, requested_id)
 
     def _schedule(self, batch_id: str, *, retry_failed_only: bool) -> None:
         if batch_id in self._tasks and not self._tasks[batch_id].done():

@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from brainrot_backend.config import Settings
@@ -9,6 +10,7 @@ from brainrot_backend.shared.models.enums import AgentRole, BatchItemStatus
 def test_health_endpoint():
     app = create_app(
         Settings(
+            storage_backend="memory",
             supabase_url=None,
             supabase_service_role_key=None,
             supabase_public_url=None,
@@ -24,6 +26,7 @@ def test_create_batch_and_upload_asset(tmp_path):
     settings = Settings(
         data_dir=tmp_path / "data",
         temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
         supabase_url=None,
         supabase_service_role_key=None,
         supabase_public_url=None,
@@ -81,8 +84,8 @@ def test_create_batch_and_upload_asset(tmp_path):
         assert payload["batch"]["requested_count"] == 5
         assert payload["batch"]["chat_id"] == chat_id
         assert len(payload["items"]) == 5
-        assert payload["batch"]["producer_agent_config_id"] is not None
-        assert payload["batch"]["narrator_agent_config_id"] is not None
+        assert payload["batch"]["producer_agent_config_id"] is None
+        assert payload["batch"]["narrator_agent_config_id"] is None
 
         first_item_id = payload["items"][0]["id"]
         asyncio.run(
@@ -113,10 +116,50 @@ def test_create_batch_and_upload_asset(tmp_path):
         assert chat_payload["items"][0]["item_id"] == first_item_id
 
 
+def test_get_batch_item_video_falls_back_to_local_render_when_batch_record_is_missing(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    app = create_app(settings)
+    batch_id = "batch-local"
+    item_id = "item-local"
+    render_path = settings.data_dir / settings.final_render_bucket / batch_id / f"{item_id}.mp4"
+    render_path.parent.mkdir(parents=True, exist_ok=True)
+    render_path.write_bytes(b"fake-mp4")
+
+    with TestClient(app) as client:
+        response = client.get(f"/v1/batches/{batch_id}/items/{item_id}/video")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "video/mp4"
+    assert response.content == b"fake-mp4"
+
+
+def test_forced_supabase_storage_requires_credentials():
+    app = create_app(
+        Settings(
+            storage_backend="supabase",
+            supabase_url=None,
+            supabase_service_role_key=None,
+            supabase_public_url=None,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="BRAINROT_STORAGE_BACKEND=supabase requires"):
+        with TestClient(app):
+            pass
+
+
 def test_chat_aggregates_multiple_batches(tmp_path):
     settings = Settings(
         data_dir=tmp_path / "data",
         temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
         supabase_url=None,
         supabase_service_role_key=None,
         supabase_public_url=None,
@@ -233,6 +276,7 @@ def test_public_chat_list_hides_empty_chats(tmp_path):
     settings = Settings(
         data_dir=tmp_path / "data",
         temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
         supabase_url=None,
         supabase_service_role_key=None,
         supabase_public_url=None,
@@ -301,6 +345,7 @@ def test_chat_recommendations_prefer_high_retention_formats(tmp_path):
     settings = Settings(
         data_dir=tmp_path / "data",
         temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
         supabase_url=None,
         supabase_service_role_key=None,
         supabase_public_url=None,

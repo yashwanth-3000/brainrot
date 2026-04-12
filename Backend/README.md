@@ -113,7 +113,8 @@ Copy `.env.example` to `.env` and fill in the values below.
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `BRAINROT_OPENAI_API_KEY` | yes | | OpenAI API key, proxied through the custom LLM endpoint |
-| `BRAINROT_OPENAI_MODEL` | no | `gpt-5` | Model name passed to OpenAI |
+| `BRAINROT_OPENAI_MODEL` | no | `gpt-5.4-mini` | Model name passed to OpenAI |
+| `BRAINROT_OPENAI_REASONING_EFFORT` | no | `low` | Reasoning effort passed to OpenAI Responses calls |
 | `BRAINROT_OPENAI_BASE_URL` | no | `https://api.openai.com/v1` | OpenAI API base URL |
 
 ### Firecrawl
@@ -171,11 +172,12 @@ Copy `.env.example` to `.env` and fill in the values below.
 | `BRAINROT_ALLOWED_GAMEPLAY_GAMES_CSV` | no | `gta-5,minecraft,roblox,subway-surfers` | Allowed gameplay game tags |
 | `BRAINROT_AUTO_SEED_ASSETS` | no | `true` | Auto-seed clips and fonts from `assets/` on startup |
 
-### Supabase (production only)
+### Supabase storage
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `BRAINROT_SUPABASE_URL` | no | | Supabase project API URL — omit to use in-memory storage |
+| `BRAINROT_STORAGE_BACKEND` | no | `auto` | Storage backend: `auto`, `supabase`, or `memory` |
+| `BRAINROT_SUPABASE_URL` | no | | Supabase project API URL |
 | `BRAINROT_SUPABASE_SERVICE_ROLE_KEY` | no | | Supabase service role key |
 | `BRAINROT_SUPABASE_PUBLIC_URL` | no | | Public-facing blob URL for generated video links |
 
@@ -459,6 +461,7 @@ Key tables:
 For Supabase, create a project, run `sql/schema.sql` in the SQL editor, and add:
 
 ```env
+BRAINROT_STORAGE_BACKEND=supabase
 BRAINROT_SUPABASE_URL=https://<project>.supabase.co
 BRAINROT_SUPABASE_SERVICE_ROLE_KEY=...
 BRAINROT_SUPABASE_PUBLIC_URL=https://<project>.supabase.co/storage/v1/object/public

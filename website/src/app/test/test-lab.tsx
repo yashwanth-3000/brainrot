@@ -98,6 +98,15 @@ const EVENT_TYPES = [
   "source_ingested",
   "producer_conversation_started",
   "producer_tool_called",
+  "section_planning_started",
+  "section_planning_completed",
+  "coverage_plan_ready",
+  "slot_generation_started",
+  "slot_generation_completed",
+  "slot_generation_failed",
+  "slot_repair_started",
+  "slot_repair_completed",
+  "producer_bundle_completed",
   "scripts_ready",
   "narrator_conversation_started",
   "narrator_audio_ready",
@@ -1335,14 +1344,48 @@ function LogIcon({ iconKey }: { iconKey: LogIconKey }) {
 }
 
 function producerProviderLabel(mode: string | null) {
-  return mode === "elevenlabs_native" ? "ElevenLabs Agent" : "OpenAI";
+  return mode === "elevenlabs_native" ? "ElevenLabs Agent" : "CrewAI + OpenAI";
+}
+
+function narrationProviderLabel(mode: string | null) {
+  return mode === "elevenlabs_agent" ? "ElevenLabs Agent" : "ElevenLabs Voice API";
+}
+
+function narrationInFlightCopy(mode: string | null, payload: Record<string, unknown>) {
+  if (mode === "elevenlabs_agent") {
+    return {
+      providerLabel: "ElevenLabs Agent",
+      title: `The ElevenLabs narrator agent is still speaking ${videoLabelFromPayload(payload)}`,
+      detail: "A live ElevenLabs agent conversation is still producing speech audio for this script before forced alignment can begin.",
+    };
+  }
+  return {
+    providerLabel: "ElevenLabs Voice API",
+    title: `ElevenLabs is still generating voiceover audio for ${videoLabelFromPayload(payload)}`,
+    detail: "The backend is generating direct ElevenLabs speech audio with the selected voice before subtitle timing can begin.",
+  };
+}
+
+function narrationStartedCopy(mode: string | null, payload: Record<string, unknown>) {
+  if (mode === "elevenlabs_agent") {
+    return {
+      providerLabel: "ElevenLabs Agent",
+      title: `An ElevenLabs narrator agent conversation started for ${videoLabelFromPayload(payload)}`,
+      detail: "The approved script is now being injected into a live ElevenLabs agent conversation so subtitle timing can be built from real audio.",
+    };
+  }
+  return {
+    providerLabel: "ElevenLabs Voice API",
+    title: `ElevenLabs voice generation started for ${videoLabelFromPayload(payload)}`,
+    detail: "The approved script is now being sent directly to the ElevenLabs speech API so real voice audio can be generated for this reel.",
+  };
 }
 
 function producerStageCopy(mode: string | null, model: string | null) {
   if (mode === "elevenlabs_native") {
     return `An ElevenLabs producer agent is generating scripts with its configured model${model ? ` (${model})` : ""} and can return the bundle through the submit_script_bundle server tool.`;
   }
-  return `OpenAI ${model ?? "model"} is generating short-form scripts from the Firecrawl brief for this batch.`;
+  return `CrewAI is planning article coverage and using OpenAI ${model ?? "model"} to write one section-based script per slot.`;
 }
 
 function humanizeEventType(value: string) {
@@ -1469,6 +1512,116 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
     iconKey: "backend" as LogIconKey,
     providerLabel: "Backend",
   };
+  if (event.type === "section_planning_started") {
+    return {
+      ...base,
+      iconKey: "openai",
+      providerLabel: "CrewAI",
+      title: "CrewAI is planning article coverage",
+      detail: withEventMeta(
+        "The source markdown is being split into meaningful article sections before any scripts are written.",
+        event,
+      ),
+    };
+  }
+  if (event.type === "section_planning_completed") {
+    return {
+      ...base,
+      tone: "success" as const,
+      iconKey: "success",
+      providerLabel: "CrewAI",
+      title: "CrewAI finished section planning",
+      detail: withEventMeta(
+        `${payload.section_count ?? 0} article sections were extracted for coverage planning.`,
+        event,
+      ),
+    };
+  }
+  if (event.type === "coverage_plan_ready") {
+    return {
+      ...base,
+      iconKey: "openai",
+      providerLabel: "CrewAI",
+      title: "CrewAI coverage plan is ready",
+      detail: withEventMeta(
+        `${payload.slot_count ?? 0} section-based script slots were planned from ${payload.section_count ?? 0} extracted sections.`,
+        event,
+      ),
+    };
+  }
+  if (event.type === "slot_generation_started") {
+    return {
+      ...base,
+      iconKey: "openai",
+      providerLabel: "CrewAI",
+      title: `CrewAI is writing slot ${Number(payload.slot_index ?? 0) + 1} from the ${stringValue(payload.section_heading) ? `"${stringValue(payload.section_heading)}"` : "assigned"} section`,
+      detail: withEventMeta(
+        `This slot is covering a different article section with the ${stringValue(payload.angle_family) ?? "assigned"} angle family.`,
+        event,
+      ),
+    };
+  }
+  if (event.type === "slot_generation_completed") {
+    return {
+      ...base,
+      tone: "success" as const,
+      iconKey: "success",
+      providerLabel: "CrewAI",
+      title: `CrewAI finished slot ${Number(payload.slot_index ?? 0) + 1}`,
+      detail: withEventMeta(
+        `The section draft for ${stringValue(payload.section_heading) ?? "this slot"} is ready for bundle QA.`,
+        event,
+      ),
+    };
+  }
+  if (event.type === "slot_generation_failed") {
+    return {
+      ...base,
+      tone: "danger" as const,
+      iconKey: "danger",
+      providerLabel: "CrewAI",
+      title: `CrewAI failed slot ${Number(payload.slot_index ?? 0) + 1}`,
+      detail: withEventMeta(stringValue(payload.error) ?? "CrewAI could not complete this slot.", event),
+    };
+  }
+  if (event.type === "slot_repair_started") {
+    return {
+      ...base,
+      iconKey: "qa",
+      providerLabel: "CrewAI Repair",
+      title: `CrewAI is repairing slot ${Number(payload.slot_index ?? 0) + 1}`,
+      detail: withEventMeta(
+        "This slot is being rewritten to remove overlap and fix grounding issues without losing section coverage.",
+        event,
+      ),
+    };
+  }
+  if (event.type === "slot_repair_completed") {
+    return {
+      ...base,
+      tone: "success" as const,
+      iconKey: "success",
+      providerLabel: "CrewAI Repair",
+      title: `CrewAI repaired slot ${Number(payload.slot_index ?? 0) + 1}`,
+      detail: withEventMeta(
+        "The corrected slot now fits the coverage plan and can move back into QA.",
+        event,
+      ),
+    };
+  }
+  if (event.type === "producer_bundle_completed") {
+    return {
+      ...base,
+      tone: "success" as const,
+      iconKey: "success",
+      providerLabel: "CrewAI",
+      title: "CrewAI coverage bundle is complete",
+      detail: withEventMeta(
+        `${payload.slot_count ?? 0} section-based scripts are ready for final backend QA.`,
+        event,
+      ),
+    };
+  }
   if (event.type === "log") {
     const validationSummary = summarizeValidationSummary(stringValue(payload.validation_summary));
     const title = stringValue(payload.message) ?? "Backend update";
@@ -1573,15 +1726,24 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
       };
     }
     if (title.startsWith("Waiting for ElevenLabs narration audio for item ")) {
+      const mode = stringValue(payload.mode);
+      const copy = narrationInFlightCopy(mode, payload);
       return {
         ...base,
         iconKey: "elevenlabs",
-        providerLabel: "ElevenLabs Agent",
-        title: `The ElevenLabs narrator agent is still speaking ${videoLabelFromPayload(payload)}`,
-        detail: withEventMeta(
-          "A live ElevenLabs agent conversation is still producing speech audio for this script before forced alignment can begin.",
-          event,
-        ),
+        providerLabel: copy.providerLabel,
+        title: copy.title,
+        detail: withEventMeta(copy.detail, event),
+      };
+    }
+    if (title.startsWith("Waiting for ElevenLabs TTS audio for item ")) {
+      const copy = narrationInFlightCopy("elevenlabs_tts", payload);
+      return {
+        ...base,
+        iconKey: "elevenlabs",
+        providerLabel: copy.providerLabel,
+        title: copy.title,
+        detail: withEventMeta(copy.detail, event),
       };
     }
     if (title.startsWith("FFmpeg still rendering item ")) {
@@ -1844,7 +2006,7 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
       ),
     };
   }
-    if (event.type === "scripts_ready") {
+  if (event.type === "scripts_ready") {
     const mode = stringValue(payload.mode);
     return {
       ...base,
@@ -1853,21 +2015,20 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
       providerLabel: producerProviderLabel(mode),
       title: "Script generation is complete",
       detail: withEventMeta(
-        `${payload.script_count ?? 0} scripts cleared local QA after ${payload.attempt_count ?? 0} generation attempt${Number(payload.attempt_count) === 1 ? "" : "s"} and ${payload.repair_count ?? 0} repair pass${Number(payload.repair_count) === 1 ? "" : "es"}. ${mode === "elevenlabs_native" ? "These scripts came from the ElevenLabs producer agent." : "These scripts came from OpenAI generation."}`,
+        `${payload.script_count ?? 0} scripts cleared local QA after ${payload.attempt_count ?? 0} generation attempt${Number(payload.attempt_count) === 1 ? "" : "s"} and ${payload.repair_count ?? 0} repair pass${Number(payload.repair_count) === 1 ? "" : "es"}. ${mode === "elevenlabs_native" ? "These scripts came from the ElevenLabs producer agent." : `${payload.section_count ?? payload.script_count ?? 0} article sections were planned into ${payload.planned_count ?? payload.script_count ?? 0} section-based script slots through the CrewAI producer.`}`,
         event,
       ),
     };
   }
   if (event.type === "narrator_conversation_started") {
+    const mode = stringValue(payload.mode);
+    const copy = narrationStartedCopy(mode, payload);
     return {
       ...base,
       iconKey: "elevenlabs",
-      providerLabel: "ElevenLabs Agent",
-      title: `An ElevenLabs narrator agent conversation started for ${videoLabelFromPayload(payload)}`,
-      detail: withEventMeta(
-        "The approved script is now being injected into a live ElevenLabs agent conversation so subtitle timing can be built from real audio.",
-        event,
-      ),
+      providerLabel: copy.providerLabel,
+      title: copy.title,
+      detail: withEventMeta(copy.detail, event),
     };
   }
   if (event.type === "alignment_ready") {
@@ -1958,6 +2119,7 @@ function buildActiveOperations(events: BatchEventRecord[], nowTick: number): Act
 
 function clearResolvedOperations(operations: Map<string, BatchEventRecord>, event: BatchEventRecord) {
   const itemId = stringValue(event.payload.item_id);
+  const slotId = stringValue(event.payload.slot_id);
   const status = stringValue(event.payload.status);
   const stage = stringValue(event.payload.stage);
 
@@ -1969,6 +2131,12 @@ function clearResolvedOperations(operations: Map<string, BatchEventRecord>, even
     status === "partial_failed"
   ) {
     operations.delete("ingest");
+  }
+  if (event.type === "section_planning_completed" || event.type === "coverage_plan_ready") {
+    operations.delete("producer:planning");
+  }
+  if ((event.type === "slot_generation_completed" || event.type === "slot_generation_failed" || event.type === "slot_repair_completed") && slotId) {
+    operations.delete(`producer:${slotId}`);
   }
   if (event.type === "scripts_ready" || event.type === "batch_completed" || (event.type === "error" && stage === "producer")) {
     operations.delete("producer");
@@ -2006,6 +2174,13 @@ function deleteOperationsByPrefix(operations: Map<string, BatchEventRecord>, pre
 function activeOperationKey(event: BatchEventRecord) {
   const stage = stringValue(event.payload.stage);
   const itemId = stringValue(event.payload.item_id);
+  const slotId = stringValue(event.payload.slot_id);
+  if (event.type === "section_planning_started") {
+    return "producer:planning";
+  }
+  if ((event.type === "slot_generation_started" || event.type === "slot_repair_started") && slotId) {
+    return `producer:${slotId}`;
+  }
   if (event.type === "narrator_conversation_started" && itemId) {
     return `narration:${itemId}`;
   }
@@ -2124,7 +2299,7 @@ function buildActivitySummary(
   );
 
   const mixedSegments = [
-    countsByKind.producer ? `${countsByKind.producer} OpenAI script ${countsByKind.producer === 1 ? "job" : "jobs"}` : null,
+    countsByKind.producer ? `${countsByKind.producer} CrewAI producer ${countsByKind.producer === 1 ? "job" : "jobs"}` : null,
     countsByKind.narration ? `${countsByKind.narration} ElevenLabs narration ${countsByKind.narration === 1 ? "job" : "jobs"}` : null,
     countsByKind.render ? `${countsByKind.render} FFmpeg render ${countsByKind.render === 1 ? "job" : "jobs"}` : null,
     countsByKind.assets ? `${countsByKind.assets} asset planning ${countsByKind.assets === 1 ? "step" : "steps"}` : null,
@@ -2143,23 +2318,28 @@ function buildActivitySummary(
 
   if (countsByKind.producer > 0 && activeOperations.length === countsByKind.producer) {
     return {
-      title: "OpenAI is generating or repairing scripts",
-      detail: "OpenAI is generating the script bundle from the Firecrawl brief while backend QA checks word count, hook grounding, duplicate ideas, and source facts.",
+      title: "CrewAI is planning and writing section-based scripts",
+      detail: "CrewAI is covering different parts of the article and using OpenAI to write one short per slot while backend QA checks grounding, overlap, and uniqueness.",
       liveLabel: primary.liveLabel,
       tone: primary.tone,
       iconKey: "openai",
-      providerLabel: "OpenAI",
+      providerLabel: "CrewAI",
     };
   }
 
   if (countsByKind.narration > 0 && activeOperations.length === countsByKind.narration) {
+    const narrationProvider = primary.providerLabel;
     return {
-      title: `ElevenLabs narrator-agent conversations are live for ${countsByKind.narration} ${countsByKind.narration === 1 ? "video" : "videos"}`,
-      detail: "Approved scripts are being spoken inside live ElevenLabs agent conversations, then ElevenLabs forced alignment timestamps every spoken word from the real audio.",
+      title: narrationProvider === "ElevenLabs Agent"
+        ? `ElevenLabs narrator-agent conversations are live for ${countsByKind.narration} ${countsByKind.narration === 1 ? "video" : "videos"}`
+        : `ElevenLabs voice generation is running for ${countsByKind.narration} ${countsByKind.narration === 1 ? "video" : "videos"}`,
+      detail: narrationProvider === "ElevenLabs Agent"
+        ? "Approved scripts are being spoken inside live ElevenLabs agent conversations, then ElevenLabs forced alignment timestamps every spoken word from the real audio."
+        : "Approved scripts are being turned into direct ElevenLabs speech, then timing data is used to sync subtitles against the real voiceover.",
       liveLabel: primary.liveLabel,
       tone: primary.tone,
       iconKey: "elevenlabs",
-      providerLabel: "ElevenLabs Agent",
+      providerLabel: narrationProvider,
     };
   }
 

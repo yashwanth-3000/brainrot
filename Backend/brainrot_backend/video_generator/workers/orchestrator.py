@@ -24,6 +24,39 @@ from brainrot_backend.shared.storage.base import BlobStore, Repository
 
 logger = logging.getLogger(__name__)
 
+INTRO_DIVERSITY_PATTERNS = (
+    {
+        "id": "step-first",
+        "hook": "{short_fact} is the step to lock in first",
+        "opening": "{fact} is the step to lock in first.",
+    },
+    {
+        "id": "constraint-angle",
+        "hook": "{short_fact} is the constraint shaping the workflow",
+        "opening": "{fact} is the constraint shaping the workflow.",
+    },
+    {
+        "id": "proof-angle",
+        "hook": "{short_fact} is the clearest proof point in the source",
+        "opening": "{fact} is the clearest proof point in the source.",
+    },
+    {
+        "id": "handoff-angle",
+        "hook": "{short_fact} is the handoff worth tracking",
+        "opening": "{fact} is the handoff worth tracking.",
+    },
+    {
+        "id": "bottleneck-angle",
+        "hook": "{short_fact} is the bottleneck to watch",
+        "opening": "{fact} is the bottleneck to watch.",
+    },
+    {
+        "id": "creator-frame",
+        "hook": "{short_fact} is the creator-facing change to notice",
+        "opening": "{fact} is the creator-facing change to notice.",
+    },
+)
+
 
 class BatchOrchestrator:
     def __init__(
@@ -124,6 +157,7 @@ class BatchOrchestrator:
             accepted_scripts: list[ScriptDraft] = []
             accepted_title_keys: set[str] = set()
             accepted_hook_keys: set[str] = set()
+            accepted_intro_style_ids: set[str] = set()
             merged_angles = []
             merged_source_brief = None
             used_gameplay_ids: set[str] = set()
@@ -145,6 +179,7 @@ class BatchOrchestrator:
             }
             render_status_promoted = False
             producer_started_at = time.perf_counter()
+            producer_chunk_count = 0
 
             async def launch_item(item: BatchItemRecord, script: ScriptDraft) -> None:
                 nonlocal batch, render_status_promoted
@@ -209,25 +244,22 @@ class BatchOrchestrator:
                     unresolved.extend(chunk_items[len(bundle_scripts):])
 
                 for item, script in zip(chunk_items, bundle_scripts, strict=False):
+                    script, intro_style_id = self._prepare_script_for_acceptance(
+                        script,
+                        source_facts=merged_source_brief.facts if merged_source_brief is not None else bundle.source_brief.facts,
+                        item_index=item.item_index,
+                        occupied_intro_style_ids=accepted_intro_style_ids,
+                        force_title_rewrite=script.title.strip().casefold() in accepted_title_keys,
+                    )
                     title_key = script.title.strip().casefold()
                     hook_key = script.hook.strip().casefold()
                     if title_key in accepted_title_keys or hook_key in accepted_hook_keys:
-                        diversified = self._diversify_script_identity(
-                            script,
-                            source_facts=merged_source_brief.facts if merged_source_brief is not None else bundle.source_brief.facts,
-                            item_index=item.item_index,
-                        )
-                        diversified_title_key = diversified.title.strip().casefold()
-                        diversified_hook_key = diversified.hook.strip().casefold()
-                        if diversified_title_key in accepted_title_keys or diversified_hook_key in accepted_hook_keys:
-                            unresolved.append(item)
-                            continue
-                        script = diversified
-                        title_key = diversified_title_key
-                        hook_key = diversified_hook_key
+                        unresolved.append(item)
+                        continue
 
                     accepted_title_keys.add(title_key)
                     accepted_hook_keys.add(hook_key)
+                    accepted_intro_style_ids.add(intro_style_id)
                     accepted_scripts.append(script)
                     accepted_now += 1
                     await launch_item(item, script)
@@ -339,11 +371,15 @@ class BatchOrchestrator:
             ]
             if missing_items and not render_status_promoted:
                 batch = await self._set_batch_status(batch_id, BatchStatus.SCRIPTING)
-                chunk_size = max(1, self.settings.producer_chunk_size)
-                chunks = [
-                    missing_items[index: index + chunk_size]
-                    for index in range(0, len(missing_items), chunk_size)
-                ]
+                if self.settings.producer_mode == "direct_openai":
+                    chunks = [missing_items]
+                else:
+                    chunk_size = max(1, self.settings.producer_chunk_size)
+                    chunks = [
+                        missing_items[index: index + chunk_size]
+                        for index in range(0, len(missing_items), chunk_size)
+                    ]
+                producer_chunk_count = len(chunks)
                 await asyncio.gather(
                     *[
                         produce_chunk(chunk, chunk_index + 1)
@@ -364,7 +400,7 @@ class BatchOrchestrator:
                 batch_metadata["producer_metrics"] = {
                     "mode": self.settings.producer_mode,
                     "chunk_size": self.settings.producer_chunk_size,
-                    "chunk_count": max(1, (len(missing_items) + max(1, self.settings.producer_chunk_size) - 1) // max(1, self.settings.producer_chunk_size)),
+                    "chunk_count": max(1, producer_chunk_count or 0),
                     "script_count": len(accepted_scripts),
                     "elapsed_seconds": round(time.perf_counter() - producer_started_at, 2),
                 }
@@ -473,6 +509,8 @@ class BatchOrchestrator:
         artifact = await self.agent_service.narrate_item(
             batch_id=batch.id,
             batch_item_id=item.id,
+            item_index=item.item_index,
+            requested_count=batch.requested_count,
             script=script,
             premium_audio=batch.premium_audio,
             requested_config_id=batch.narrator_agent_config_id,
@@ -615,6 +653,8 @@ class BatchOrchestrator:
                 "subtitle_font_name": subtitle_track.preset.font_name,
                 "subtitle_font_file": subtitle_track.preset.font_path.name,
                 "subtitle_font_source_path": str(subtitle_track.preset.font_path),
+                "narration_voice_id": artifact.metadata.get("voice_id"),
+                "narration_voice_label": artifact.metadata.get("voice_label"),
                 "thumbnail_url": thumbnail_public_url,
             },
         )
@@ -805,16 +845,65 @@ class BatchOrchestrator:
         }
 
     @staticmethod
+    def _prepare_script_for_acceptance(
+        script: ScriptDraft,
+        *,
+        source_facts: list[str],
+        item_index: int,
+        occupied_intro_style_ids: set[str],
+        force_title_rewrite: bool = False,
+    ) -> tuple[ScriptDraft, str]:
+        metadata = script.metadata if isinstance(script.metadata, dict) else {}
+        angle_family = metadata.get("angle_family") if isinstance(metadata.get("angle_family"), str) else None
+        section_ids = metadata.get("section_ids") if isinstance(metadata.get("section_ids"), list) else None
+        if angle_family or section_ids:
+            primary_section_id = str(section_ids[0]).strip() if section_ids else ""
+            stable_identity = angle_family or primary_section_id or f"slot-{item_index}"
+            return script, f"semantic:{stable_identity}"
+
+        if BatchOrchestrator._script_has_grounded_identity(script):
+            if force_title_rewrite:
+                rewritten_title = BatchOrchestrator._rewrite_title_from_source_facts(
+                    script.title,
+                    [*script.source_facts_used, *source_facts],
+                )
+                if rewritten_title and rewritten_title != script.title:
+                    return script.model_copy(update={"title": rewritten_title}), "title-rewrite"
+            return script, "grounded"
+
+        return BatchOrchestrator._diversify_script_identity(
+            script,
+            source_facts=source_facts,
+            item_index=item_index,
+            occupied_intro_style_ids=occupied_intro_style_ids,
+            force_title_rewrite=force_title_rewrite,
+        )
+
+    @staticmethod
     def _diversify_script_identity(
         script: ScriptDraft,
         *,
         source_facts: list[str],
         item_index: int,
-    ) -> ScriptDraft:
-        if not source_facts:
-            return script
+        occupied_intro_style_ids: set[str],
+        force_title_rewrite: bool = False,
+    ) -> tuple[ScriptDraft, str]:
+        candidate_facts = []
+        seen_facts: set[str] = set()
+        for fact in [*script.source_facts_used, *source_facts]:
+            cleaned_fact = fact.strip().rstrip(".")
+            if not cleaned_fact:
+                continue
+            key = cleaned_fact.casefold()
+            if key in seen_facts:
+                continue
+            seen_facts.add(key)
+            candidate_facts.append(cleaned_fact)
 
-        fact = source_facts[item_index % len(source_facts)].strip().rstrip(".")
+        if not candidate_facts:
+            return script, "original"
+
+        fact = candidate_facts[item_index % len(candidate_facts)]
         shortened_fact = fact
         for separator in (".", ";", " - ", " — ", ":"):
             if separator in shortened_fact:
@@ -824,19 +913,77 @@ class BatchOrchestrator:
         if len(words) > 9:
             shortened_fact = " ".join(words[:9]).strip()
 
-        title = shortened_fact.title() if shortened_fact.islower() else shortened_fact
-        hook = fact if fact else script.hook
-        source_facts_used = list(script.source_facts_used)
-        if fact and fact not in source_facts_used:
-            source_facts_used = [fact, *source_facts_used][: max(2, len(source_facts_used) + 1)]
+        occupied_pattern_ids = {
+            style_id
+            for style_id in occupied_intro_style_ids
+            if any(style_id == pattern["id"] for pattern in INTRO_DIVERSITY_PATTERNS)
+        }
+        pattern = INTRO_DIVERSITY_PATTERNS[item_index % len(INTRO_DIVERSITY_PATTERNS)]
+        if len(occupied_pattern_ids) < len(INTRO_DIVERSITY_PATTERNS):
+            for offset in range(len(INTRO_DIVERSITY_PATTERNS)):
+                candidate = INTRO_DIVERSITY_PATTERNS[(item_index + offset) % len(INTRO_DIVERSITY_PATTERNS)]
+                if candidate["id"] not in occupied_pattern_ids:
+                    pattern = candidate
+                    break
 
-        return script.model_copy(
-            update={
-                "title": title or script.title,
-                "hook": hook or script.hook,
-                "source_facts_used": source_facts_used or script.source_facts_used,
-            }
+        title = script.title
+        if force_title_rewrite:
+            title = shortened_fact.title() if shortened_fact.islower() else shortened_fact
+        hook = pattern["hook"].format(fact=fact, short_fact=shortened_fact).strip()
+        opening = pattern["opening"].format(fact=fact, short_fact=shortened_fact).strip()
+        narration_text = BatchOrchestrator._replace_narration_opening(script.narration_text, opening)
+        source_facts_used = [entry for entry in script.source_facts_used if entry != fact]
+        source_facts_used = [fact, *source_facts_used][: max(2, len(script.source_facts_used) + 1)]
+
+        return (
+            script.model_copy(
+                update={
+                    "title": title or script.title,
+                    "hook": hook or script.hook,
+                    "narration_text": narration_text,
+                    "source_facts_used": source_facts_used or script.source_facts_used,
+                }
+            ),
+            pattern["id"],
         )
+
+    @staticmethod
+    def _replace_narration_opening(narration_text: str, opening_sentence: str) -> str:
+        normalized = " ".join(narration_text.split()).strip()
+        if not normalized:
+            return opening_sentence
+        sentence_breaks = [index for index in (normalized.find(". "), normalized.find("? "), normalized.find("! ")) if index != -1]
+        if sentence_breaks:
+            first_break = min(sentence_breaks)
+            remainder = normalized[first_break + 2 :].strip()
+            return f"{opening_sentence} {remainder}".strip()
+        return f"{opening_sentence} {normalized}".strip()
+
+    @staticmethod
+    def _script_has_grounded_identity(script: ScriptDraft) -> bool:
+        return bool(
+            script.title.strip()
+            and script.hook.strip()
+            and script.narration_text.strip()
+            and script.source_facts_used
+        )
+
+    @staticmethod
+    def _rewrite_title_from_source_facts(title: str, source_facts: list[str]) -> str:
+        for fact in source_facts:
+            shortened_fact = fact.strip().rstrip(".")
+            if not shortened_fact:
+                continue
+            for separator in (".", ";", " - ", " — ", ":"):
+                if separator in shortened_fact:
+                    shortened_fact = shortened_fact.split(separator, 1)[0].strip()
+                    break
+            words = shortened_fact.split()
+            if len(words) > 9:
+                shortened_fact = " ".join(words[:9]).strip()
+            if shortened_fact and shortened_fact.casefold() != title.strip().casefold():
+                return shortened_fact.title() if shortened_fact.islower() else shortened_fact
+        return title
 
     def _rank_subtitle_presets(
         self,

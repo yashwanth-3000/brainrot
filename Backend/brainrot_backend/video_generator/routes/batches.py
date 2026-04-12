@@ -13,6 +13,19 @@ from brainrot_backend.shared.models.enums import SourceKind
 router = APIRouter(prefix="/batches", tags=["batches"])
 
 
+def _local_render_path(settings, batch_id: str, item_id: str) -> Path:
+    return settings.data_dir / settings.final_render_bucket / batch_id / f"{item_id}.mp4"
+
+
+def _video_response_from_output_url(output_url: str):
+    if output_url.startswith("file://"):
+        local_path = Path(urlparse(output_url).path)
+        if not local_path.exists():
+            raise HTTPException(status_code=404, detail="Video file is missing.")
+        return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
+    return RedirectResponse(output_url)
+
+
 @router.post("", response_model=BatchEnvelope)
 async def create_batch(
     request: Request,
@@ -67,22 +80,24 @@ async def get_batch_item_video(request: Request, batch_id: str, item_id: str):
     container = request.app.state.container
     try:
         envelope = await container.batch_service.get_batch(batch_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Batch not found.") from exc
+    except KeyError:
+        envelope = None
 
-    item = next((candidate for candidate in envelope.items if candidate.id == item_id), None)
-    if item is None:
-        raise HTTPException(status_code=404, detail="Batch item not found.")
-    if not item.output_url:
-        raise HTTPException(status_code=404, detail="Video is not ready yet.")
+    if envelope is not None:
+        item = next((candidate for candidate in envelope.items if candidate.id == item_id), None)
+        if item is not None and item.output_url:
+            return _video_response_from_output_url(item.output_url)
+        if item is not None:
+            fallback_path = _local_render_path(container.settings, batch_id, item_id)
+            if fallback_path.exists():
+                return FileResponse(fallback_path, media_type="video/mp4", filename=fallback_path.name)
+            raise HTTPException(status_code=404, detail="Video is not ready yet.")
 
-    if item.output_url.startswith("file://"):
-        local_path = Path(urlparse(item.output_url).path)
-        if not local_path.exists():
-            raise HTTPException(status_code=404, detail="Video file is missing.")
-        return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
+    fallback_path = _local_render_path(container.settings, batch_id, item_id)
+    if fallback_path.exists():
+        return FileResponse(fallback_path, media_type="video/mp4", filename=fallback_path.name)
 
-    return RedirectResponse(item.output_url)
+    raise HTTPException(status_code=404, detail="Batch item video not found.")
 
 
 @router.get("/{batch_id}/events")

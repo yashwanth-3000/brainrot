@@ -75,6 +75,23 @@ def test_karaoke_sweep_splits_on_silence_gap(tmp_path):
     assert "0:00:00.55" in text
 
 
+def test_karaoke_sweep_wraps_long_segments_inside_safe_width(tmp_path):
+    presets = {preset.id: preset for preset in subtitle_presets(Settings().assets_dir / "fonts")}
+    timings = [
+        WordTiming(text="Captions", start=0.0, end=0.3),
+        WordTiming(text="that", start=0.3, end=0.45),
+        WordTiming(text="reflect", start=0.45, end=0.75),
+        WordTiming(text="your", start=0.75, end=0.95),
+        WordTiming(text="unique", start=0.95, end=1.25),
+        WordTiming(text="writing", start=1.25, end=1.55),
+        WordTiming(text="style", start=1.55, end=1.85),
+    ]
+    track = build_subtitle_track(timings, tmp_path / "karaoke-wrap.ass", preset=presets["karaoke_sweep"])
+    text = track.path.read_text(encoding="utf-8")
+
+    assert "\\N" in text
+
+
 def test_subtitle_quota_map_biases_single_word_pop_komika():
     presets = list(subtitle_presets(Settings().assets_dir / "fonts"))
     quota_map = BatchOrchestrator._build_subtitle_quota_map(presets, 10)

@@ -127,7 +127,7 @@ create table if not exists agent_runs (
   batch_id uuid not null references batches(id) on delete cascade,
   batch_item_id uuid references batch_items(id) on delete cascade,
   role text not null,
-  agent_config_id uuid not null references agent_configs(id) on delete cascade,
+  agent_config_id uuid references agent_configs(id) on delete cascade,
   status text not null,
   conversation_id text,
   error text,

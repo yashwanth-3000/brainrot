@@ -31,9 +31,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         container = build_container(resolved_settings)
         app.state.container = container
         logger.info(
-            "Brainrot Backend started (env=%s, elevenlabs=%s, supabase=%s, firecrawl=%s)",
+            "Brainrot Backend started (env=%s, elevenlabs=%s, storage=%s, supabase=%s, firecrawl=%s)",
             resolved_settings.environment,
             resolved_settings.elevenlabs_enabled,
+            resolved_settings.resolved_storage_backend,
             resolved_settings.supabase_enabled,
             resolved_settings.firecrawl_enabled,
         )

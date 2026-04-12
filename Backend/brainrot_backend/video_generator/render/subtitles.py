@@ -35,7 +35,7 @@ def subtitle_presets(fonts_root: Path) -> tuple[SubtitlePreset, ...]:
             family="karaoke_sweep",
             font_name="Montserrat ExtraBold",
             font_path=fonts_root / "brainrot" / "top-used-subtitle-fonts" / "Montserrat-ExtraBold.ttf",
-            font_size=72,
+            font_size=68,
             preferred_tags=("analysis", "study", "strategy", "ambient", "story", "documentary"),
             style_name="KaraokeSweep",
             selection_weight=10,
@@ -214,24 +214,45 @@ def _build_karaoke_lines(
     font_size: int,
 ) -> tuple[list[str], list[str]]:
     styles = [
-        f"Style: {style_name},{font_name},{font_size},&H00FFFFFF,&H0000E5FF,&H0012141A,&H64000000,1,0,0,0,100,100,0,0,1,5,0,5,70,70,220,1",
+        f"Style: {style_name},{font_name},{font_size},&H00FFFFFF,&H0000E5FF,&H0012141A,&H64000000,1,0,0,0,100,100,0,0,1,5,0,5,90,90,220,1",
     ]
     events: list[str] = []
     for segment in chunk_word_timings(
         word_timings,
-        max_words=6,
-        max_duration=2.1,
+        max_words=5,
+        max_duration=1.9,
         max_gap_seconds=0.28,
     ):
-        karaoke = "".join(
-            f"{{\\k{max(1, int((word.end - word.start) * 100))}}}{escape_ass(word.text.upper())} "
-            for word in segment
-        ).strip()
+        karaoke = _build_wrapped_karaoke_text(segment)
         segment_end = max(segment[0].start + 0.1, segment[-1].end - 0.05)
         events.append(
             f"Dialogue: 0,{format_ass_time(segment[0].start)},{format_ass_time(segment_end)},{style_name},,0,0,0,,{karaoke}"
         )
     return styles, events
+
+
+def _build_wrapped_karaoke_text(
+    segment: list[WordTiming],
+    *,
+    max_words_per_line: int = 3,
+    max_characters_per_line: int = 18,
+) -> str:
+    lines: list[list[str]] = [[]]
+    current_characters = 0
+    for word in segment:
+        cleaned_text = escape_ass(word.text.upper())
+        rendered_word = f"{{\\k{max(1, int((word.end - word.start) * 100))}}}{cleaned_text}"
+        projected_characters = current_characters + len(word.text) + (1 if lines[-1] else 0)
+        if lines[-1] and (
+            len(lines[-1]) >= max_words_per_line
+            or projected_characters > max_characters_per_line
+        ):
+            lines.append([])
+            current_characters = 0
+        lines[-1].append(rendered_word)
+        current_characters += len(word.text) + (1 if len(lines[-1]) > 1 else 0)
+
+    return "\\N".join(" ".join(line).strip() for line in lines if line).strip()
 
 
 def _build_single_word_pop_lines(

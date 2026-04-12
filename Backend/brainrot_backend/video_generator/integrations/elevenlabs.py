@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
 import io
 import json
 import logging
 import os
 import time
 import wave
+from dataclasses import dataclass
 from typing import Any
 
 import certifi
@@ -21,6 +24,7 @@ from elevenlabs.types import (
     ToolRequestModelToolConfig_Webhook,
     TtsConversationalConfigOutput,
     TurnConfig,
+    VoiceSettings,
     WebhookToolApiSchemaConfigInput,
 )
 
@@ -36,6 +40,21 @@ from brainrot_backend.shared.models.domain import (
 from brainrot_backend.shared.models.enums import AgentRole
 
 logger = logging.getLogger(__name__)
+
+VOICE_USE_CASE_PRIORITY = {
+    "social_media": 0,
+    "conversational": 1,
+    "informative_educational": 2,
+    "entertainment_tv": 3,
+    "narrative_story": 4,
+}
+
+
+@dataclass(frozen=True)
+class NarratorVoiceProfile:
+    voice_id: str
+    label: str
+    source: str
 
 
 class CollectingAudioInterface(AudioInterface):
@@ -129,11 +148,14 @@ def build_narrator_dynamic_variables(
 def build_narrator_override(
     *,
     premium_audio: bool,
+    voice_id: str | None = None,
 ) -> dict[str, Any]:
-    override: dict[str, Any] = {}
+    tts_override: dict[str, Any] = {}
     if premium_audio:
-        override["tts"] = {"expressive_mode": True}
-    return override if override else {}
+        tts_override["expressive_mode"] = True
+    if voice_id:
+        tts_override["voice_id"] = voice_id
+    return {"tts": tts_override} if tts_override else {}
 
 
 class ElevenLabsAgentsClient:
@@ -142,45 +164,66 @@ class ElevenLabsAgentsClient:
         os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
         self.settings = settings
         self.client = ElevenLabs(api_key=settings.elevenlabs_api_key) if settings.elevenlabs_enabled else None
+        self._narrator_voice_profiles: list[NarratorVoiceProfile] | None = None
 
-    async def bootstrap_agents(self, public_base_url: str) -> tuple[list[AgentConfigRecord], list[str]]:
-        if not public_base_url:
-            raise RuntimeError("A public base URL is required to bootstrap ElevenLabs agents.")
+    async def bootstrap_agents(
+        self,
+        public_base_url: str,
+        *,
+        include_producer: bool = True,
+        include_narrator: bool = True,
+    ) -> tuple[list[AgentConfigRecord], list[str]]:
+        if not include_producer and not include_narrator:
+            return [], []
+
         self._require_enabled()
-        self._require_agent_bootstrap_config()
+        if include_producer and not public_base_url:
+            raise RuntimeError("A public base URL is required to bootstrap ElevenLabs producer agents.")
 
-        tool = await asyncio.to_thread(self._upsert_submit_script_tool, public_base_url.rstrip("/"))
-        logger.info("Upserted submit_script_bundle tool: %s", tool.id)
-        producer = await asyncio.to_thread(self._upsert_producer_agent, public_base_url.rstrip("/"), tool.id)
-        logger.info("Upserted Producer agent: %s (branch=%s)", producer.agent_id, producer.branch_id)
-        narrator = await asyncio.to_thread(self._upsert_narrator_agent)
-        logger.info("Upserted Narrator agent: %s (branch=%s)", narrator.agent_id, narrator.branch_id)
+        configs: list[AgentConfigRecord] = []
+        tool_ids: list[str] = []
 
-        producer_record = AgentConfigRecord(
-            role=AgentRole.PRODUCER,
-            name=producer.name or self.settings.producer_agent_name,
-            agent_id=producer.agent_id,
-            branch_id=producer.branch_id,
-            version_id=producer.version_id,
-            tool_ids=[tool.id],
-            metadata={
-                "tags": list(producer.tags or []),
-                "conversation_config": dump_model(producer.conversation_config),
-            },
-        )
-        narrator_record = AgentConfigRecord(
-            role=AgentRole.NARRATOR,
-            name=narrator.name or self.settings.narrator_agent_name,
-            agent_id=narrator.agent_id,
-            branch_id=narrator.branch_id,
-            version_id=narrator.version_id,
-            tool_ids=[],
-            metadata={
-                "tags": list(narrator.tags or []),
-                "conversation_config": dump_model(narrator.conversation_config),
-            },
-        )
-        return [producer_record, narrator_record], [tool.id]
+        if include_producer:
+            self._require_agent_bootstrap_config()
+            tool = await asyncio.to_thread(self._upsert_submit_script_tool, public_base_url.rstrip("/"))
+            logger.info("Upserted submit_script_bundle tool: %s", tool.id)
+            producer = await asyncio.to_thread(self._upsert_producer_agent, public_base_url.rstrip("/"), tool.id)
+            logger.info("Upserted Producer agent: %s (branch=%s)", producer.agent_id, producer.branch_id)
+            configs.append(
+                AgentConfigRecord(
+                    role=AgentRole.PRODUCER,
+                    name=producer.name or self.settings.producer_agent_name,
+                    agent_id=producer.agent_id,
+                    branch_id=producer.branch_id,
+                    version_id=producer.version_id,
+                    tool_ids=[tool.id],
+                    metadata={
+                        "tags": list(producer.tags or []),
+                        "conversation_config": dump_model(producer.conversation_config),
+                    },
+                )
+            )
+            tool_ids.append(tool.id)
+
+        if include_narrator:
+            narrator = await asyncio.to_thread(self._upsert_narrator_agent)
+            logger.info("Upserted Narrator agent: %s (branch=%s)", narrator.agent_id, narrator.branch_id)
+            configs.append(
+                AgentConfigRecord(
+                    role=AgentRole.NARRATOR,
+                    name=narrator.name or self.settings.narrator_agent_name,
+                    agent_id=narrator.agent_id,
+                    branch_id=narrator.branch_id,
+                    version_id=narrator.version_id,
+                    tool_ids=[],
+                    metadata={
+                        "tags": list(narrator.tags or []),
+                        "conversation_config": dump_model(narrator.conversation_config),
+                    },
+                )
+            )
+
+        return configs, tool_ids
 
     async def run_producer_conversation(
         self,
@@ -263,6 +306,8 @@ class ElevenLabsAgentsClient:
         timeout_seconds: int,
         idle_seconds: float,
         min_speech_seconds: float = 8.0,
+        voice_id: str | None = None,
+        voice_label: str | None = None,
     ) -> tuple[NarrationArtifact, AgentConversationRecord]:
         self._require_enabled()
         activity = {
@@ -287,8 +332,12 @@ class ElevenLabsAgentsClient:
         audio_interface.output = tracking_output  # type: ignore[assignment]
 
         logger.info(
-            "Starting Narrator conversation for item %s (agent=%s, timeout=%ds, idle=%.1fs)",
-            batch_item_id, agent_config.agent_id, timeout_seconds, idle_seconds,
+            "Starting Narrator conversation for item %s (agent=%s, timeout=%ds, idle=%.1fs, voice=%s)",
+            batch_item_id,
+            agent_config.agent_id,
+            timeout_seconds,
+            idle_seconds,
+            voice_label or voice_id or "default",
         )
         conversation = Conversation(
             client=self._client(),
@@ -303,6 +352,7 @@ class ElevenLabsAgentsClient:
                 ),
                 conversation_config_override=build_narrator_override(
                     premium_audio=premium_audio,
+                    voice_id=voice_id,
                 ) or None,
             ),
             callback_agent_response=on_text,
@@ -425,6 +475,8 @@ class ElevenLabsAgentsClient:
                 "forced_alignment": dump_model(alignment),
                 "conversation": conversation_record.metadata,
                 "trimmed_trailing_seconds": trimmed_trailing_seconds,
+                "voice_id": voice_id,
+                "voice_label": voice_label,
             },
         )
         logger.info(
@@ -433,6 +485,128 @@ class ElevenLabsAgentsClient:
             artifact.word_timings[-1].end if artifact.word_timings else 0,
         )
         return artifact, conversation_record
+
+    async def narrate_script_tts(
+        self,
+        *,
+        batch_id: str,
+        batch_item_id: str,
+        script: ScriptDraft,
+        voice_id: str | None = None,
+        voice_label: str | None = None,
+    ) -> NarrationArtifact:
+        self._require_enabled()
+        selected_voice_id = voice_id or self.settings.default_elevenlabs_voice_id
+        if not selected_voice_id:
+            raise RuntimeError("BRAINROT_DEFAULT_ELEVENLABS_VOICE_ID must be configured for direct TTS narration.")
+
+        logger.info(
+            "Starting direct ElevenLabs TTS for item %s (voice=%s, model=%s)",
+            batch_item_id,
+            voice_label or selected_voice_id,
+            self.settings.elevenlabs_model_id,
+        )
+        output_format = self.settings.elevenlabs_tts_output_format
+        tts_response = await asyncio.to_thread(
+            self._client().text_to_speech.convert_with_timestamps,
+            selected_voice_id,
+            text=script.narration_text,
+            model_id=self.settings.elevenlabs_model_id,
+            output_format=output_format,
+            voice_settings=VoiceSettings(speed=self.settings.narrator_tts_speed),
+        )
+        response_payload = dump_model(tts_response)
+        audio_base64 = str(
+            response_payload.get("audio_base_64")
+            or response_payload.get("audio_base64")
+            or getattr(tts_response, "audio_base_64", "")
+            or ""
+        )
+        audio_bytes = base64.b64decode(audio_base64) if audio_base64 else b""
+        if not audio_bytes:
+            raise RuntimeError(f"ElevenLabs TTS returned empty audio for item {batch_item_id}.")
+
+        transcript = script.narration_text.strip()
+        word_timings = word_timings_from_forced_alignment(tts_response)
+        trimmed_trailing_seconds = 0.0
+        audio_format = output_format.split("_", 1)[0]
+        audio_mime_type = "audio/wav" if audio_format == "wav" else "audio/mpeg"
+        if word_timings and audio_format == "wav":
+            audio_bytes, trimmed_trailing_seconds = trim_wav_trailing_padding(
+                audio_bytes,
+                target_duration_seconds=word_timings[-1].end + self.settings.narration_trim_padding_seconds,
+                min_excess_seconds=self.settings.narration_trim_min_excess_seconds,
+            )
+
+        return NarrationArtifact(
+            audio_bytes=audio_bytes,
+            format=audio_format,
+            transcript=transcript,
+            word_timings=word_timings,
+            conversation_id=None,
+            metadata={
+                "audio_mime_type": audio_mime_type,
+                "timing_response": response_payload,
+                "trimmed_trailing_seconds": trimmed_trailing_seconds,
+                "voice_id": selected_voice_id,
+                "voice_label": voice_label or "Default narrator voice",
+                "narration_mode": "elevenlabs_tts",
+                "batch_id": batch_id,
+                "batch_item_id": batch_item_id,
+            },
+        )
+
+    async def select_narrator_voice(
+        self,
+        *,
+        batch_id: str,
+        item_index: int,
+        requested_count: int,
+    ) -> NarratorVoiceProfile | None:
+        profiles = await self.list_narrator_voice_profiles()
+        if not profiles:
+            return None
+        if len(profiles) == 1 or requested_count <= 1:
+            return profiles[0]
+
+        if requested_count >= 5:
+            span = min(5, len(profiles))
+        else:
+            span = min(2, len(profiles))
+
+        offset = int(hashlib.sha256(batch_id.encode("utf-8")).hexdigest()[:8], 16) % len(profiles)
+        return profiles[(offset + item_index) % span]
+
+    async def list_narrator_voice_profiles(self) -> list[NarratorVoiceProfile]:
+        if self._narrator_voice_profiles is not None:
+            return list(self._narrator_voice_profiles)
+
+        configured = list(self._configured_narrator_voice_profiles())
+        discovered: list[NarratorVoiceProfile] = []
+        try:
+            discovered = await asyncio.to_thread(self._discover_narrator_voice_profiles)
+        except Exception as exc:  # pragma: no cover - network-backed fallback
+            logger.warning("Failed to discover ElevenLabs narrator voices: %s", exc)
+
+        merged: list[NarratorVoiceProfile] = []
+        seen: set[str] = set()
+        for profile in [*configured, *discovered]:
+            if profile.voice_id in seen:
+                continue
+            seen.add(profile.voice_id)
+            merged.append(profile)
+
+        if not merged and self.settings.default_elevenlabs_voice_id:
+            merged.append(
+                NarratorVoiceProfile(
+                    voice_id=self.settings.default_elevenlabs_voice_id,
+                    label="Default narrator voice",
+                    source="default",
+                )
+            )
+
+        self._narrator_voice_profiles = merged[:5]
+        return list(self._narrator_voice_profiles)
 
     async def _fetch_conversation_audio(self, conversation_id: str, retries: int = 3) -> bytes:
         for attempt in range(retries):
@@ -703,6 +877,56 @@ class ElevenLabsAgentsClient:
             version_description="Codex bootstrap sync",
         )
 
+    def _configured_narrator_voice_profiles(self) -> list[NarratorVoiceProfile]:
+        profiles: list[NarratorVoiceProfile] = []
+        for index, voice_id in enumerate(self.settings.narrator_voice_ids):
+            label = "Default narrator voice" if index == 0 else f"Configured narrator voice {index + 1}"
+            profiles.append(
+                NarratorVoiceProfile(
+                    voice_id=voice_id,
+                    label=label,
+                    source="configured",
+                )
+            )
+        return profiles
+
+    def _discover_narrator_voice_profiles(self) -> list[NarratorVoiceProfile]:
+        response = self._client().voices.get_all()
+        voices = list(getattr(response, "voices", []) or [])
+        ranked: list[tuple[int, str, NarratorVoiceProfile]] = []
+        for voice in voices:
+            labels = getattr(voice, "labels", {}) or {}
+            language = str(labels.get("language") or "").strip().lower()
+            if language and language != "en":
+                continue
+            use_case = str(labels.get("use_case") or "").strip().lower()
+            category = str(getattr(voice, "category", "") or "").strip().lower()
+            if category != "premade":
+                continue
+            voice_id = str(getattr(voice, "voice_id", "") or "").strip()
+            if not voice_id:
+                continue
+            name = str(getattr(voice, "name", "") or "Narrator voice").strip()
+            ranked.append(
+                (
+                    VOICE_USE_CASE_PRIORITY.get(use_case, 99),
+                    name.casefold(),
+                    NarratorVoiceProfile(
+                        voice_id=voice_id,
+                        label=name,
+                        source="discovered",
+                    ),
+                )
+            )
+
+        ranked.sort(key=lambda item: (item[0], item[1]))
+        discovered = [profile for _, _, profile in ranked]
+        if self.settings.default_elevenlabs_voice_id:
+            discovered.sort(
+                key=lambda profile: 0 if profile.voice_id == self.settings.default_elevenlabs_voice_id else 1
+            )
+        return discovered
+
     def _find_tool_by_name(self, name: str):
         cursor: str | None = None
         while True:
@@ -779,6 +1003,9 @@ def producer_prompt() -> str:
         "workflow steps, numeric limits, or backend architecture specifics.\n"
         "- Avoid generic startup ad copy, rhetorical-question hooks, and filler phrases like 'Meet X', "
         "'Introducing X', 'revolutionary', 'ultimate solution', or 'step into the future'.\n"
+        "- Do not use canned lead-ins like 'Start with this detail', 'The fastest win here', "
+        "'Most people miss this part', 'If this gets skipped, the workflow falls apart', "
+        "or 'Creators will care about this'.\n"
         "- Every hook must mention a concrete detail from the script's own source_facts_used list, not just a vague benefit promise.\n"
         "- Spread the scripts across different angles instead of repeating the same broad product pitch.\n"
         "\nEach script must stay faithful to the source, be unique, hyper-engaging, "

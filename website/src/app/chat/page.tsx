@@ -76,7 +76,8 @@ function ChatPageInner({
   const [isLoading, setIsLoading] = useState(false);
   const [composerMode, setComposerMode] = useState<ModeId | null>(null);
   const [chatSessionId, setChatSessionId] = useState<string | null>(requestedChatId);
-  const [batchCount, setBatchCount] = useState(() => readStoredBatchCount());
+  const [batchCount, setBatchCount] = useState(DEFAULT_CHAT_BATCH_COUNT);
+  const [isBatchCountHydrated, setIsBatchCountHydrated] = useState(false);
   const [draftMessage, setDraftMessage] = useState(prefillPrompt);
 
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -100,11 +101,16 @@ function ChatPageInner({
   }, [prefillPrompt]);
 
   useEffect(() => {
-    if (typeof window === "undefined") {
+    setBatchCount(readStoredBatchCount());
+    setIsBatchCountHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isBatchCountHydrated || typeof window === "undefined") {
       return;
     }
     window.localStorage.setItem(CHAT_BATCH_COUNT_STORAGE_KEY, String(batchCount));
-  }, [batchCount]);
+  }, [batchCount, isBatchCountHydrated]);
 
   const handleSend = useCallback(async (payload: PromptSendPayload) => {
     if (isLoading) {

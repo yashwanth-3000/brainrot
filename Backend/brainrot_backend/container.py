@@ -32,7 +32,13 @@ class ServiceContainer:
 
 def build_container(settings: Settings) -> ServiceContainer:
     settings.ensure_directories()
-    if settings.supabase_enabled:
+    if settings.storage_backend == "supabase" and not settings.supabase_enabled:
+        raise RuntimeError(
+            "BRAINROT_STORAGE_BACKEND=supabase requires BRAINROT_SUPABASE_URL and "
+            "BRAINROT_SUPABASE_SERVICE_ROLE_KEY to be configured."
+        )
+
+    if settings.resolved_storage_backend == "supabase":
         repository = SupabaseRepository(
             settings.supabase_url or "",
             settings.supabase_service_role_key or "",

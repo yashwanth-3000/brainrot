@@ -19,6 +19,10 @@ from brainrot_backend.video_generator.services.assets import filter_allowed_game
 router = APIRouter(prefix="/video-edit", tags=["video-edit"])
 
 
+def _local_preview_dir(settings, batch_id: str) -> Path:
+    return settings.data_dir / settings.final_render_bucket / batch_id
+
+
 @router.get("/options", response_model=VideoEditOptionsResponse)
 async def get_video_edit_options(request: Request) -> VideoEditOptionsResponse:
     container = request.app.state.container
@@ -64,20 +68,34 @@ async def get_video_edit_preview_video(request: Request, batch_id: str):
     container = request.app.state.container
     try:
         envelope = await container.batch_service.get_batch(batch_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Preview batch not found.") from exc
+    except KeyError:
+        envelope = None
 
-    if not envelope.items:
-        raise HTTPException(status_code=404, detail="Preview item not found.")
+    if envelope is not None:
+        if not envelope.items:
+            raise HTTPException(status_code=404, detail="Preview item not found.")
 
-    item = envelope.items[0]
-    if not item.output_url:
-        raise HTTPException(status_code=404, detail="Preview video is not ready yet.")
+        item = envelope.items[0]
+        if not item.output_url:
+            preview_dir = _local_preview_dir(container.settings, batch_id)
+            fallback_candidates = sorted(preview_dir.glob("*.mp4"))
+            if fallback_candidates:
+                fallback_path = fallback_candidates[0]
+                return FileResponse(fallback_path, media_type="video/mp4", filename=fallback_path.name)
+            raise HTTPException(status_code=404, detail="Preview video is not ready yet.")
 
-    if item.output_url.startswith("file://"):
-        local_path = Path(urlparse(item.output_url).path)
-        if not local_path.exists():
-            raise HTTPException(status_code=404, detail="Preview file is missing.")
-        return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
+        if item.output_url.startswith("file://"):
+            local_path = Path(urlparse(item.output_url).path)
+            if not local_path.exists():
+                raise HTTPException(status_code=404, detail="Preview file is missing.")
+            return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
 
-    return RedirectResponse(item.output_url)
+        return RedirectResponse(item.output_url)
+
+    preview_dir = _local_preview_dir(container.settings, batch_id)
+    fallback_candidates = sorted(preview_dir.glob("*.mp4"))
+    if fallback_candidates:
+        fallback_path = fallback_candidates[0]
+        return FileResponse(fallback_path, media_type="video/mp4", filename=fallback_path.name)
+
+    raise HTTPException(status_code=404, detail="Preview batch not found.")

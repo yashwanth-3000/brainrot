@@ -1,14 +1,18 @@
 import json
+import asyncio
 
 from brainrot_backend.config import Settings
 from brainrot_backend.video_generator.integrations.elevenlabs import (
+    NarratorVoiceProfile,
     build_narrator_override,
     build_producer_dynamic_variables,
 )
 from brainrot_backend.shared.models.domain import GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
 from brainrot_backend.shared.models.domain import AnglePlan
 from brainrot_backend.shared.models.enums import SourceKind
+from brainrot_backend.video_generator.integrations.elevenlabs import ElevenLabsAgentsClient
 from brainrot_backend.video_generator.services.agents import AgentService
+from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator
 
 
 def test_build_producer_dynamic_variables_serializes_context():
@@ -34,6 +38,133 @@ def test_build_producer_dynamic_variables_serializes_context():
 def test_build_narrator_override_only_sets_supported_flags():
     override = build_narrator_override(premium_audio=True)
     assert override == {"tts": {"expressive_mode": True}}
+
+
+def test_build_narrator_override_can_switch_voice():
+    override = build_narrator_override(premium_audio=False, voice_id="voice-123")
+    assert override == {"tts": {"voice_id": "voice-123"}}
+
+
+def test_diversify_script_identity_rotates_intro_styles():
+    script = ScriptDraft(
+        title="Angle One",
+        hook="Original hook",
+        narration_text=(
+            "Original first sentence. Then it explains the workflow in more detail so the rest of the script "
+            "still has enough room to land naturally and stay inside the target timing."
+        ),
+        caption_text="caption",
+        estimated_seconds=26,
+        visual_beats=["beat"],
+        music_tags=["music"],
+        gameplay_tags=["gameplay"],
+        source_facts_used=["Thinking Mode inside Adobe Express", "Editable captions for every platform"],
+        qa_notes=[],
+    )
+
+    first, first_style = BatchOrchestrator._diversify_script_identity(
+        script,
+        source_facts=["Thinking Mode inside Adobe Express", "Editable captions for every platform"],
+        item_index=0,
+        occupied_intro_style_ids=set(),
+    )
+    second, second_style = BatchOrchestrator._diversify_script_identity(
+        script,
+        source_facts=["Thinking Mode inside Adobe Express", "Editable captions for every platform"],
+        item_index=1,
+        occupied_intro_style_ids={first_style},
+    )
+
+    assert first_style != second_style
+    assert first.hook != second.hook
+    assert first.narration_text != second.narration_text
+    assert first.source_facts_used[0] != second.source_facts_used[0]
+    assert "detail that changes the story" not in first.hook.casefold()
+    assert "part most people glide past" not in second.hook.casefold()
+
+
+def test_prepare_script_for_acceptance_preserves_grounded_direct_openai_script():
+    script = ScriptDraft(
+        title="Architecture angle",
+        hook="The backend routes generation work through a section coverage plan.",
+        narration_text=(
+            "The backend routes generation work through a section coverage plan. "
+            "That keeps one short focused on architecture instead of flattening the whole article into one repeated pitch."
+        ),
+        caption_text="caption",
+        estimated_seconds=26,
+        visual_beats=["beat"],
+        music_tags=["music"],
+        gameplay_tags=["gameplay"],
+        source_facts_used=[
+            "The backend routes generation work through a section coverage plan",
+            "Each slot maps to a distinct section cluster",
+        ],
+        qa_notes=[],
+    )
+
+    prepared, style_id = BatchOrchestrator._prepare_script_for_acceptance(
+        script,
+        source_facts=script.source_facts_used,
+        item_index=0,
+        occupied_intro_style_ids=set(),
+    )
+
+    assert prepared == script
+    assert style_id == "grounded"
+
+
+def test_prepare_script_for_acceptance_preserves_structured_script_identity():
+    script = ScriptDraft(
+        title="Architecture angle",
+        hook="The backend routes generation work through a section coverage plan.",
+        narration_text=(
+            "The backend routes generation work through a section coverage plan. "
+            "That keeps one short focused on architecture instead of flattening the whole article into one repeated pitch."
+        ),
+        caption_text="caption",
+        estimated_seconds=26,
+        visual_beats=["beat"],
+        music_tags=["music"],
+        gameplay_tags=["gameplay"],
+        source_facts_used=["The backend routes generation work through a section coverage plan", "Each slot maps to a distinct section cluster"],
+        qa_notes=[],
+        metadata={"section_ids": ["architecture"], "angle_family": "architecture"},
+    )
+
+    prepared, style_id = BatchOrchestrator._prepare_script_for_acceptance(
+        script,
+        source_facts=script.source_facts_used,
+        item_index=0,
+        occupied_intro_style_ids=set(),
+    )
+
+    assert prepared == script
+    assert style_id == "semantic:architecture"
+
+
+def test_select_narrator_voice_rotates_across_batch():
+    client = ElevenLabsAgentsClient.__new__(ElevenLabsAgentsClient)
+    client.settings = Settings()
+    client.client = None
+    client._narrator_voice_profiles = [
+        NarratorVoiceProfile(voice_id="voice-a", label="Voice A", source="test"),
+        NarratorVoiceProfile(voice_id="voice-b", label="Voice B", source="test"),
+        NarratorVoiceProfile(voice_id="voice-c", label="Voice C", source="test"),
+    ]
+
+    selected = [
+        asyncio.run(
+            client.select_narrator_voice(
+                batch_id="batch-123",
+                item_index=item_index,
+                requested_count=5,
+            )
+        ).voice_id
+        for item_index in range(5)
+    ]
+
+    assert len(set(selected)) >= 2
 
 
 def test_validate_generated_bundle_enforces_word_count():
@@ -200,8 +331,66 @@ def test_normalize_generated_bundle_repairs_hook_grounding_and_facts():
         "Thinking Mode inside Adobe Express",
         "Live editable captions for social posts",
     ]
-    assert normalized.scripts[0].hook == "Thinking Mode inside Adobe Express"
+    assert normalized.scripts[0].hook == "Thinking Mode inside Adobe Express is where the source gets specific"
     service._validate_generated_bundle(normalized, requested_count=1)  # type: ignore[attr-defined]
+
+
+def test_normalize_generated_bundle_preserves_existing_slot_identity():
+    service = AgentService.__new__(AgentService)
+    service.settings = Settings()
+    bundle = GeneratedBundle(
+        source_brief=SourceBrief(
+            canonical_title="Content Hub",
+            summary="AI content personalization",
+            facts=[
+                "Thinking Mode inside Adobe Express",
+                "Live editable captions for social posts",
+                "Use My Voice analyzes past posts",
+            ],
+            entities=["Content Hub", "Adobe Express"],
+            tone="energetic",
+            do_not_drift=["Do not invent product features"],
+            source_urls=["https://example.com/post"],
+        ),
+        angles=[],
+        scripts=[
+            ScriptDraft(
+                title=f"Angle {index}",
+                hook=[
+                    "Thinking Mode inside Adobe Express keeps the edit grounded",
+                    "Live editable captions for social posts speed up packaging",
+                    "Use My Voice analyzes past posts before rewriting",
+                ][index],
+                narration_text=f"Section {index} explains a different workflow detail. It keeps the rest of the workflow moving with real details from the source." + (" more" * 90),
+                caption_text="caption",
+                estimated_seconds=26,
+                visual_beats=["beat"],
+                music_tags=["music"],
+                gameplay_tags=["gameplay"],
+                source_facts_used=[
+                    "Thinking Mode inside Adobe Express",
+                    "Live editable captions for social posts",
+                    "Use My Voice analyzes past posts",
+                ],
+                qa_notes=[],
+                metadata={
+                    "section_ids": [f"section-{index}"],
+                    "angle_family": f"family-{index}",
+                },
+            )
+            for index in range(3)
+        ],
+    )
+
+    normalized, repair_stats = service._normalize_generated_bundle(bundle)  # type: ignore[attr-defined]
+
+    hooks = [script.hook for script in normalized.scripts]
+    openings = [script.narration_text.split(".")[0].strip() for script in normalized.scripts]
+    assert len(set(hooks)) == 3
+    assert len(set(openings)) == 3
+    assert repair_stats["hook_repairs"] == 0
+    assert normalized.scripts[0].metadata["section_ids"] == ["section-0"]
+    assert normalized.scripts[0].metadata["angle_family"] == "family-0"
 
 
 def test_custom_llm_chat_payload_is_normalized_for_openai():

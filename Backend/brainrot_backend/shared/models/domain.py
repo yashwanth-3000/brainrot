@@ -34,6 +34,7 @@ class SourceBrief(BaseModel):
     tone: str
     do_not_drift: list[str]
     source_urls: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class AnglePlan(BaseModel):
@@ -43,6 +44,10 @@ class AnglePlan(BaseModel):
     energy_level: str
     visual_mood: str
     music_mood: str
+    angle_family: str | None = None
+    section_id: str | None = None
+    section_heading: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ScriptDraft(BaseModel):
@@ -56,6 +61,7 @@ class ScriptDraft(BaseModel):
     gameplay_tags: list[str]
     source_facts_used: list[str]
     qa_notes: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class IngestedSource(BaseModel):
@@ -71,6 +77,7 @@ class GeneratedBundle(BaseModel):
     source_brief: SourceBrief
     angles: list[AnglePlan]
     scripts: list[ScriptDraft]
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class NarrationArtifact(BaseModel):
@@ -101,7 +108,7 @@ class AgentRunRecord(BaseModel):
     batch_id: str
     batch_item_id: str | None = None
     role: AgentRole
-    agent_config_id: str
+    agent_config_id: str | None = None
     status: str = "queued"
     conversation_id: str | None = None
     error: str | None = None
