@@ -39,8 +39,8 @@ Backend/
 
 - `brainrot_backend/main.py`: FastAPI app wiring and router registration
 - `brainrot_backend/container.py`: dependency container and infrastructure composition
-- `brainrot_backend/shared/models`: shared API and domain models
-- `brainrot_backend/shared/storage`: in-memory and Supabase repositories/blob storage
+- `brainrot_backend/core/models`: shared API and domain models
+- `brainrot_backend/core/storage`: in-memory and Supabase repositories/blob storage
 - `brainrot_backend/video_generator`: all code required to turn source material into rendered vertical videos
 - `brainrot_backend/recommendation_system`: all code required to track reel engagement and recommend follow-up generations
 - `tests/`: backend test coverage, split across pipeline, integrations, subtitles, and API behavior

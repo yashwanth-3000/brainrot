@@ -1,5 +1,5 @@
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import AnglePlan, GeneratedBundle, ScriptDraft, SourceBrief
+from brainrot_backend.core.models.domain import AnglePlan, GeneratedBundle, ScriptDraft, SourceBrief
 from brainrot_backend.video_generator.producer_crewai.flow import CrewAIProducerFlow
 from brainrot_backend.video_generator.producer_crewai.models import CoveragePlan, CoverageSlotPlan, CrewAIScriptPayload, SectionCluster
 from brainrot_backend.video_generator.producer_crewai.tasks import build_crewai_llm

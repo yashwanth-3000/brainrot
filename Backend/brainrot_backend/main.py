@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI
 
@@ -11,7 +12,7 @@ from brainrot_backend.video_generator.routes.batches import router as batches_ro
 from brainrot_backend.recommendation_system.routes import router as chats_router
 from brainrot_backend.video_generator.routes.video_edit import router as video_edit_router
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.api import HealthResponse
+from brainrot_backend.core.models.api import HealthResponse
 from brainrot_backend.container import build_container
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def lifespan(app: FastAPI):
         container = build_container(resolved_settings)
         app.state.container = container
+        chat_sync_task: asyncio.Task[None] | None = None
         logger.info(
             "Brainrot Backend started (env=%s, elevenlabs=%s, storage=%s, supabase=%s, firecrawl=%s)",
             resolved_settings.environment,
@@ -48,11 +50,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     logger.info("Auto-seeded %d subtitle fonts on startup", seeded_fonts)
             except Exception as exc:
                 logger.warning("Auto-seed failed (non-fatal): %s", exc)
+
+        async def sync_existing_chats_in_background() -> None:
+            try:
+                await container.chat_service.sync_existing_chats()
+            except Exception as exc:
+                logger.warning("Chat summary sync failed (non-fatal): %s", exc)
+
+        chat_sync_task = asyncio.create_task(sync_existing_chats_in_background())
         try:
-            await container.chat_service.sync_existing_chats()
-        except Exception as exc:
-            logger.warning("Chat summary sync failed (non-fatal): %s", exc)
-        yield
+            yield
+        finally:
+            if chat_sync_task is not None and not chat_sync_task.done():
+                chat_sync_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await chat_sync_task
 
     app = FastAPI(title=resolved_settings.app_name, lifespan=lifespan)
     app.include_router(assets_router, prefix=resolved_settings.api_prefix)

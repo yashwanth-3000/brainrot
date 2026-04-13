@@ -11,8 +11,8 @@ from contextlib import suppress
 
 from brainrot_backend.config import Settings
 from brainrot_backend.video_generator.integrations.firecrawl import FirecrawlClient
-from brainrot_backend.shared.models.domain import AssetRecord, BatchItemRecord, BatchRecord, GeneratedBundle, ScriptDraft
-from brainrot_backend.shared.models.enums import AssetKind, BatchEventType, BatchItemStatus, BatchStatus
+from brainrot_backend.core.models.domain import AssetRecord, BatchItemRecord, BatchRecord, GeneratedBundle, ScriptDraft
+from brainrot_backend.core.models.enums import AssetKind, BatchEventType, BatchItemStatus, BatchStatus
 from brainrot_backend.video_generator.render.assets import AssetSelector
 from brainrot_backend.video_generator.render.ffmpeg import FFmpegRenderer
 from brainrot_backend.video_generator.render.subtitles import SubtitlePreset, build_subtitle_track, subtitle_presets
@@ -20,7 +20,7 @@ from brainrot_backend.video_generator.services.agents import AgentService
 from brainrot_backend.video_generator.services.assets import filter_allowed_gameplay_assets
 from brainrot_backend.recommendation_system.service import ChatService
 from brainrot_backend.video_generator.services.events import EventBroker
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.storage.base import BlobStore, Repository
 
 logger = logging.getLogger(__name__)
 

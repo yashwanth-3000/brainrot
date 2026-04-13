@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     AgentRunRecord,
@@ -17,7 +17,7 @@ from brainrot_backend.shared.models.domain import (
     IngestedSource,
     ShortEngagementRecord,
 )
-from brainrot_backend.shared.models.enums import AgentRole, AssetKind, BatchEventType
+from brainrot_backend.core.models.enums import AgentRole, AssetKind, BatchEventType, ChatLibraryScope
 
 
 class Repository(Protocol):
@@ -25,7 +25,12 @@ class Repository(Protocol):
 
     async def get_chat(self, chat_id: str) -> ChatRecord | None: ...
 
-    async def list_chats(self) -> list[ChatRecord]: ...
+    async def list_chats(
+        self,
+        *,
+        library_scope: ChatLibraryScope | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[ChatRecord]: ...
 
     async def update_chat(self, chat_id: str, **changes: object) -> ChatRecord: ...
 

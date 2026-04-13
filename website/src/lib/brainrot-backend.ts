@@ -1,3 +1,5 @@
+import { createClient as createSupabaseServerClient } from "@/lib/supabase/server";
+
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8000";
 
 function resolveBrainrotBackendBaseUrl(): string {
@@ -20,6 +22,30 @@ export function buildBrainrotBackendUrl(path: string): URL {
   const normalizedBase = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
   const normalizedPath = path.startsWith("/") ? path.slice(1) : path;
   return new URL(normalizedPath, normalizedBase);
+}
+
+export async function buildBrainrotProxyHeaders(headers?: HeadersInit): Promise<Headers> {
+  const nextHeaders = new Headers(headers);
+
+  try {
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        nextHeaders.set("Authorization", `Bearer ${session.access_token}`);
+      }
+    }
+  } catch {
+    // Auth is optional for guest flows, so route handlers can continue without a token.
+  }
+
+  return nextHeaders;
 }
 
 export async function relayJsonResponse(upstream: Response): Promise<Response> {

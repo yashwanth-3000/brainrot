@@ -1,6 +1,6 @@
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import AssetRecord, ScriptDraft
-from brainrot_backend.shared.models.enums import AssetKind
+from brainrot_backend.core.models.domain import AssetRecord, ScriptDraft
+from brainrot_backend.core.models.enums import AssetKind
 from brainrot_backend.video_generator.render.assets import AssetSelector
 from brainrot_backend.video_generator.services.assets import filter_allowed_gameplay_assets
 

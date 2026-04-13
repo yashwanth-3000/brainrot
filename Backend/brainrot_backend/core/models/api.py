@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AssetRecord,
     BatchItemRecord,
@@ -14,7 +14,7 @@ from brainrot_backend.shared.models.domain import (
     ScriptDraft,
     ShortEngagementRecord,
 )
-from brainrot_backend.shared.models.enums import BatchItemStatus, BatchStatus
+from brainrot_backend.core.models.enums import BatchItemStatus, BatchStatus
 
 
 class HealthResponse(BaseModel):

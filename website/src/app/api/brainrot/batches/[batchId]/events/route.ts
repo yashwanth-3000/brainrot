@@ -1,4 +1,4 @@
-import { buildBrainrotBackendUrl } from "@/lib/brainrot-backend";
+import { buildBrainrotBackendUrl, buildBrainrotProxyHeaders } from "@/lib/brainrot-backend";
 
 export const runtime = "nodejs";
 
@@ -7,14 +7,15 @@ export async function GET(
   context: { params: Promise<{ batchId: string }> },
 ) {
   const { batchId } = await context.params;
+  const headers = await buildBrainrotProxyHeaders({
+    Accept: "text/event-stream",
+    "Cache-Control": "no-cache",
+    ...(request.headers.get("last-event-id")
+      ? { "Last-Event-ID": request.headers.get("last-event-id") as string }
+      : {}),
+  });
   const upstream = await fetch(buildBrainrotBackendUrl(`/v1/batches/${batchId}/events`), {
-    headers: {
-      Accept: "text/event-stream",
-      "Cache-Control": "no-cache",
-      ...(request.headers.get("last-event-id")
-        ? { "Last-Event-ID": request.headers.get("last-event-id") as string }
-        : {}),
-    },
+    headers,
     cache: "no-store",
   });
 

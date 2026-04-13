@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans, Instrument_Serif } from 'next/font/google'
 import { MotionOrchestrator } from './_components/motion-orchestrator'
+import { AuthProvider } from '@/components/auth/auth-provider'
 import './globals.css'
 
 const dmSans = DM_Sans({
@@ -31,8 +32,10 @@ export default function RootLayout({
   return (
     <html lang="en" data-motion="ready">
       <body className={`${dmSans.variable} ${instrumentSerif.variable}`}>
-        <MotionOrchestrator />
-        {children}
+        <AuthProvider>
+          <MotionOrchestrator />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )

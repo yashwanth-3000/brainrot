@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
 
-from brainrot_backend.shared.models.api import (
+from brainrot_backend.auth import RequestAuthContext
+from brainrot_backend.core.models.api import (
     ChatEnvelope,
     ChatGeneratedAsset,
     ChatGeneratedAssetsResponse,
@@ -16,9 +17,9 @@ from brainrot_backend.shared.models.api import (
     ShortEngagementEnvelope,
     ShortEngagementRequest,
 )
-from brainrot_backend.shared.models.domain import BatchRecord, ChatRecord, ScriptDraft, ShortEngagementRecord
-from brainrot_backend.shared.models.enums import BatchItemStatus
-from brainrot_backend.shared.storage.base import Repository
+from brainrot_backend.core.models.domain import BatchRecord, ChatRecord, ScriptDraft, ShortEngagementRecord
+from brainrot_backend.core.models.enums import BatchItemStatus, ChatLibraryScope
+from brainrot_backend.core.storage.base import Repository
 
 
 def utc_now() -> datetime:
@@ -34,6 +35,7 @@ class ChatService:
     async def create_chat(
         self,
         *,
+        auth: RequestAuthContext,
         title: str | None = None,
         source_label: str | None = None,
         source_url: str | None = None,
@@ -46,6 +48,8 @@ class ChatService:
         )
         chat = ChatRecord(
             title=resolved_title,
+            library_scope=auth.library_scope,
+            owner_user_id=auth.user_id,
             last_source_label=source_label,
             last_source_url=source_url,
         )
@@ -56,6 +60,7 @@ class ChatService:
         self,
         chat_id: str,
         *,
+        auth: RequestAuthContext,
         title: str | None = None,
         source_label: str | None = None,
         source_url: str | None = None,
@@ -74,6 +79,8 @@ class ChatService:
                 ChatRecord(
                     id=chat_id,
                     title=resolved_title,
+                    library_scope=auth.library_scope,
+                    owner_user_id=auth.user_id,
                     updated_at=now,
                     last_source_label=source_label,
                     last_source_url=source_url,
@@ -81,6 +88,7 @@ class ChatService:
                 )
             )
 
+        self._assert_chat_access(existing, auth)
         changes: dict[str, object] = {"updated_at": now}
         if resolved_title and resolved_title != existing.title:
             changes["title"] = resolved_title
@@ -92,25 +100,33 @@ class ChatService:
             changes["last_status"] = last_status
         return await self.repository.update_chat(chat_id, **changes)
 
-    async def list_chats(self) -> ChatListResponse:
-        chats = await self.repository.list_chats()
+    async def list_chats(self, auth: RequestAuthContext) -> ChatListResponse:
+        chats = (
+            await self.repository.list_chats(owner_user_id=auth.user_id)
+            if auth.is_authenticated
+            else await self.repository.list_chats(library_scope=ChatLibraryScope.GENERAL)
+        )
         public_chats = [chat for chat in chats if chat.total_exported > 0]
         return ChatListResponse(items=public_chats)
 
-    async def get_chat(self, chat_id: str) -> ChatEnvelope:
+    async def get_chat(self, chat_id: str, auth: RequestAuthContext) -> ChatEnvelope:
+        chat = await self.get_accessible_chat(chat_id, auth)
+        return ChatEnvelope(chat=chat)
+
+    async def get_accessible_chat(self, chat_id: str, auth: RequestAuthContext) -> ChatRecord:
         chat = await self.repository.get_chat(chat_id)
         if chat is None:
             raise KeyError(chat_id)
-        return ChatEnvelope(chat=chat)
+        self._assert_chat_access(chat, auth)
+        return chat
 
     async def record_short_engagement(
         self,
         chat_id: str,
         payload: ShortEngagementRequest,
+        auth: RequestAuthContext,
     ) -> ShortEngagementEnvelope:
-        chat = await self.repository.get_chat(chat_id)
-        if chat is None:
-            raise KeyError(chat_id)
+        await self.get_accessible_chat(chat_id, auth)
 
         item = await self.repository.get_batch_item(payload.item_id)
         if item is None:
@@ -145,13 +161,12 @@ class ChatService:
         self,
         chat_id: str,
         *,
+        auth: RequestAuthContext,
         session_id: str | None = None,
     ) -> ChatRecommendationResponse:
-        chat = await self.repository.get_chat(chat_id)
-        if chat is None:
-            raise KeyError(chat_id)
+        chat = await self.get_accessible_chat(chat_id, auth)
 
-        generated_assets = await self.list_chat_generated_assets(chat_id)
+        generated_assets = await self.list_chat_generated_assets(chat_id, auth)
         assets_by_item_id = {asset.item_id: asset for asset in generated_assets.items}
         asset_positions = {asset.item_id: index + 1 for index, asset in enumerate(generated_assets.items)}
         engagements = [
@@ -348,8 +363,12 @@ class ChatService:
             },
         )
 
-    async def list_chat_generated_assets(self, chat_id: str) -> ChatGeneratedAssetsResponse:
-        chat = await self.repository.get_chat(chat_id)
+    async def list_chat_generated_assets(
+        self,
+        chat_id: str,
+        auth: RequestAuthContext,
+    ) -> ChatGeneratedAssetsResponse:
+        chat = await self.get_accessible_chat(chat_id, auth)
         batches = await self.repository.list_batches_for_chat(chat_id)
         assets: list[ChatGeneratedAsset] = []
 
@@ -473,6 +492,15 @@ class ChatService:
         chats = await self.repository.list_chats()
         for chat in chats:
             await self.refresh_chat_summary(chat.id)
+
+    def _assert_chat_access(self, chat: ChatRecord, auth: RequestAuthContext) -> None:
+        if auth.is_authenticated:
+            if chat.library_scope != ChatLibraryScope.USER or chat.owner_user_id != auth.user_id:
+                raise PermissionError("This chat belongs to a different user library.")
+            return
+
+        if chat.library_scope != ChatLibraryScope.GENERAL:
+            raise PermissionError("Sign in with Google to access this chat.")
 
     def _build_dimension_insights(
         self,

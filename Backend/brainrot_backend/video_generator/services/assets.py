@@ -8,9 +8,9 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import AssetRecord
-from brainrot_backend.shared.models.enums import AssetKind
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.models.domain import AssetRecord
+from brainrot_backend.core.models.enums import AssetKind
+from brainrot_backend.core.storage.base import BlobStore, Repository
 
 logger = logging.getLogger(__name__)
 _FONT_SUFFIXES = {".ttf", ".otf"}

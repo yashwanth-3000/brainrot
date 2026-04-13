@@ -7,7 +7,7 @@ from typing import Any
 
 from supabase import Client, create_client
 
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     AgentRunRecord,
@@ -21,8 +21,8 @@ from brainrot_backend.shared.models.domain import (
     IngestedSource,
     ShortEngagementRecord,
 )
-from brainrot_backend.shared.models.enums import AgentRole, AssetKind, BatchEventType
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.models.enums import AgentRole, AssetKind, BatchEventType, ChatLibraryScope
+from brainrot_backend.core.storage.base import BlobStore, Repository
 
 
 def utc_now() -> datetime:
@@ -74,10 +74,18 @@ class SupabaseRepository(Repository):
             return None
         return ChatRecord.model_validate(response.data[0])
 
-    async def list_chats(self) -> list[ChatRecord]:
-        response = await self._call(
-            lambda: self.client.table("chats").select("*").order("updated_at", desc=True).execute()
-        )
+    async def list_chats(
+        self,
+        *,
+        library_scope: ChatLibraryScope | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[ChatRecord]:
+        query = self.client.table("chats").select("*")
+        if library_scope is not None:
+            query = query.eq("library_scope", library_scope.value)
+        if owner_user_id is not None:
+            query = query.eq("owner_user_id", owner_user_id)
+        response = await self._call(lambda: query.order("updated_at", desc=True).execute())
         return [ChatRecord.model_validate(row) for row in response.data]
 
     async def update_chat(self, chat_id: str, **changes: object) -> ChatRecord:

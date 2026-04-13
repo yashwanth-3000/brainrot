@@ -7,9 +7,9 @@ from brainrot_backend.video_generator.integrations.elevenlabs import (
     build_narrator_override,
     build_producer_dynamic_variables,
 )
-from brainrot_backend.shared.models.domain import GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
-from brainrot_backend.shared.models.domain import AnglePlan
-from brainrot_backend.shared.models.enums import SourceKind
+from brainrot_backend.core.models.domain import GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
+from brainrot_backend.core.models.domain import AnglePlan
+from brainrot_backend.core.models.enums import SourceKind
 from brainrot_backend.video_generator.integrations.elevenlabs import ElevenLabsAgentsClient
 from brainrot_backend.video_generator.services.agents import AgentService
 from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator

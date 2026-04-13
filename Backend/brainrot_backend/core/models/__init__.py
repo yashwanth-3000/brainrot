@@ -1,4 +1,4 @@
-from brainrot_backend.shared.models.api import (
+from brainrot_backend.core.models.api import (
     AgentBootstrapResponse,
     AssetUploadResponse,
     BatchEnvelope,
@@ -20,7 +20,7 @@ from brainrot_backend.shared.models.api import (
     VideoEditPreviewResponse,
     WebhookAckResponse,
 )
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     AgentRunRecord,
@@ -40,12 +40,13 @@ from brainrot_backend.shared.models.domain import (
     ToolScriptBundlePayload,
     WordTiming,
 )
-from brainrot_backend.shared.models.enums import (
+from brainrot_backend.core.models.enums import (
     AgentRole,
     AssetKind,
     BatchEventType,
     BatchItemStatus,
     BatchStatus,
+    ChatLibraryScope,
     SourceKind,
 )
 
@@ -72,6 +73,7 @@ __all__ = [
     "ChatEnvelope",
     "ChatGeneratedAsset",
     "ChatGeneratedAssetsResponse",
+    "ChatLibraryScope",
     "ChatListResponse",
     "ChatRecommendationResponse",
     "ChatRecord",

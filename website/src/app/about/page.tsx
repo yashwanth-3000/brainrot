@@ -112,10 +112,8 @@ function DummyPhone({ section, offset, isActive, muted, onToggleMute }: {
     if (!v) return
     if (isActive) {
       v.play().catch(() => {})
-      setPlaying(true)
     } else {
       v.pause()
-      setPlaying(false)
     }
   }, [isActive])
 
@@ -153,7 +151,6 @@ function DummyPhone({ section, offset, isActive, muted, onToggleMute }: {
         <div className={styles.phoneIsland} />
         <div className={styles.phoneScreen}>
           <div className={styles.dummyScreen}>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
             <video
               ref={videoRef}
               className={styles.dummyVideo}
@@ -162,6 +159,8 @@ function DummyPhone({ section, offset, isActive, muted, onToggleMute }: {
               loop
               playsInline
               preload="auto"
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
             />
 
             {/* gradient */}

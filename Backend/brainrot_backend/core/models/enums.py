@@ -70,3 +70,8 @@ class BatchEventType(StrEnum):
 class AgentRole(StrEnum):
     PRODUCER = "producer"
     NARRATOR = "narrator"
+
+
+class ChatLibraryScope(StrEnum):
+    GENERAL = "general"
+    USER = "user"

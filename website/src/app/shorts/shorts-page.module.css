@@ -27,8 +27,8 @@
 .sidebar {
   height: 100%;
   overflow-y: auto;
-  /* top padding accounts for the fixed navbar (62px) + visual breathing room */
-  padding: 72px 14px 20px 16px;
+  /* top padding accounts for the fixed navbar (56px) + visual breathing room */
+  padding: 66px 14px 20px 16px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   background: #000;
   scrollbar-width: thin;
@@ -241,7 +241,7 @@
 /* Spacer inside main that sits behind the fixed navbar */
 .mainNavSpacer {
   flex-shrink: 0;
-  height: 62px;
+  height: 56px;
 }
 
 /* Slim context bar */
@@ -1347,7 +1347,7 @@
     overflow: visible;
   }
 
-  .navSpacer { height: 62px; }
+  .navSpacer { height: 56px; }
 
   .libraryLayout {
     grid-template-columns: 1fr;
@@ -1359,7 +1359,7 @@
     overflow: visible;
     border-right: 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-    padding: 72px 16px 16px;
+    padding: 66px 16px 16px;
   }
 
   .mainNavSpacer {

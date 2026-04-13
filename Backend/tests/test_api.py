@@ -1,10 +1,32 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from brainrot_backend.auth import AuthenticationError, RequestAuthContext
 from brainrot_backend.config import Settings
+from brainrot_backend.core.models.domain import AgentConfigRecord, ScriptDraft
+from brainrot_backend.core.models.enums import AgentRole, BatchItemStatus
 from brainrot_backend.main import create_app
-from brainrot_backend.shared.models.domain import AgentConfigRecord, ScriptDraft
-from brainrot_backend.shared.models.enums import AgentRole, BatchItemStatus
+
+
+def install_test_auth(app):
+    async def resolve_request(authorization: str | None):
+        if not authorization:
+            return RequestAuthContext()
+        if authorization == "Bearer guest":
+            return RequestAuthContext()
+        if authorization == "Bearer user-1":
+            return RequestAuthContext(
+                user_id="11111111-1111-1111-1111-111111111111",
+                email="user1@example.com",
+            )
+        if authorization == "Bearer user-2":
+            return RequestAuthContext(
+                user_id="22222222-2222-2222-2222-222222222222",
+                email="user2@example.com",
+            )
+        raise AuthenticationError("Invalid Supabase session.")
+
+    app.state.container.auth_service.resolve_request = resolve_request
 
 
 def test_health_endpoint():
@@ -153,6 +175,103 @@ def test_forced_supabase_storage_requires_credentials():
     with pytest.raises(RuntimeError, match="BRAINROT_STORAGE_BACKEND=supabase requires"):
         with TestClient(app):
             pass
+
+
+def test_chat_routes_scope_general_and_user_libraries(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        install_test_auth(app)
+        repository = app.state.container.repository
+        import asyncio
+
+        general_chat_response = client.post("/v1/chats", json={"title": "General chat"})
+        assert general_chat_response.status_code == 200
+        general_chat_id = general_chat_response.json()["chat"]["id"]
+        asyncio.run(repository.update_chat(general_chat_id, total_exported=1))
+
+        user_chat_response = client.post(
+            "/v1/chats",
+            headers={"Authorization": "Bearer user-1"},
+            json={"title": "Private chat"},
+        )
+        assert user_chat_response.status_code == 200
+        user_chat_id = user_chat_response.json()["chat"]["id"]
+        asyncio.run(repository.update_chat(user_chat_id, total_exported=2))
+
+        guest_list_response = client.get("/v1/chats")
+        assert guest_list_response.status_code == 200
+        assert [item["id"] for item in guest_list_response.json()["items"]] == [general_chat_id]
+
+        user_list_response = client.get("/v1/chats", headers={"Authorization": "Bearer user-1"})
+        assert user_list_response.status_code == 200
+        assert [item["id"] for item in user_list_response.json()["items"]] == [user_chat_id]
+
+        guest_blocked_response = client.get(f"/v1/chats/{user_chat_id}")
+        assert guest_blocked_response.status_code == 403
+
+        user_blocked_response = client.get(
+            f"/v1/chats/{general_chat_id}",
+            headers={"Authorization": "Bearer user-1"},
+        )
+        assert user_blocked_response.status_code == 403
+
+
+def test_batch_routes_enforce_chat_ownership(tmp_path):
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    app = create_app(settings)
+    with TestClient(app) as client:
+        install_test_auth(app)
+        app.state.container.batch_service._schedule = lambda *args, **kwargs: None
+
+        chat_response = client.post(
+            "/v1/chats",
+            headers={"Authorization": "Bearer user-1"},
+            json={"title": "User batch chat"},
+        )
+        assert chat_response.status_code == 200
+        chat_id = chat_response.json()["chat"]["id"]
+
+        batch_response = client.post(
+            "/v1/batches",
+            headers={"Authorization": "Bearer user-1"},
+            data={
+                "chat_id": chat_id,
+                "source_url": "https://example.com/private-source",
+                "count": "5",
+            },
+        )
+        assert batch_response.status_code == 200
+        batch_id = batch_response.json()["batch"]["id"]
+
+        guest_response = client.get(f"/v1/batches/{batch_id}")
+        assert guest_response.status_code == 403
+
+        other_user_response = client.get(
+            f"/v1/batches/{batch_id}",
+            headers={"Authorization": "Bearer user-2"},
+        )
+        assert other_user_response.status_code == 403
+
+        owner_response = client.get(
+            f"/v1/batches/{batch_id}",
+            headers={"Authorization": "Bearer user-1"},
+        )
+        assert owner_response.status_code == 200
 
 
 def test_chat_aggregates_multiple_batches(tmp_path):

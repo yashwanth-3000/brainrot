@@ -29,7 +29,7 @@ from elevenlabs.types import (
 )
 
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     IngestedSource,
@@ -37,7 +37,7 @@ from brainrot_backend.shared.models.domain import (
     ScriptDraft,
     WordTiming,
 )
-from brainrot_backend.shared.models.enums import AgentRole
+from brainrot_backend.core.models.enums import AgentRole
 
 logger = logging.getLogger(__name__)
 

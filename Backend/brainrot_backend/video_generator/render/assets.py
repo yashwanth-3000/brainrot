@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 from typing import Iterable
 
-from brainrot_backend.shared.models.domain import AssetRecord, ScriptDraft
-from brainrot_backend.shared.models.enums import AssetKind
+from brainrot_backend.core.models.domain import AssetRecord, ScriptDraft
+from brainrot_backend.core.models.enums import AssetKind
 
 
 class AssetSelector:

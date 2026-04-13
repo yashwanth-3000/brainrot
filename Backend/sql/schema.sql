@@ -1,6 +1,8 @@
 create table if not exists chats (
   id text primary key,
   title text not null,
+  library_scope text not null default 'general',
+  owner_user_id uuid,
   created_at timestamptz not null,
   updated_at timestamptz not null,
   last_source_label text,
@@ -14,6 +16,35 @@ create table if not exists chats (
   cover_output_url text,
   metadata jsonb not null default '{}'::jsonb
 );
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'chats_library_scope_check'
+  ) then
+    alter table chats
+      add constraint chats_library_scope_check
+      check (library_scope in ('general', 'user'));
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'chats_owner_scope_consistency_check'
+  ) then
+    alter table chats
+      add constraint chats_owner_scope_consistency_check
+      check (
+        (library_scope = 'general' and owner_user_id is null)
+        or (library_scope = 'user' and owner_user_id is not null)
+      );
+  end if;
+end $$;
 
 create table if not exists batches (
   id uuid primary key,
@@ -34,6 +65,13 @@ create table if not exists batches (
 
 create index if not exists chats_updated_at_idx
   on chats (updated_at desc);
+
+create index if not exists chats_library_scope_updated_at_idx
+  on chats (library_scope, updated_at desc);
+
+create index if not exists chats_owner_user_id_updated_at_idx
+  on chats (owner_user_id, updated_at desc)
+  where owner_user_id is not null;
 
 create index if not exists batches_chat_id_idx
   on batches (chat_id);

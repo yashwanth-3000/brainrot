@@ -5,8 +5,8 @@ import json
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable
 
-from brainrot_backend.shared.models.enums import BatchEventType
-from brainrot_backend.shared.storage.base import Repository
+from brainrot_backend.core.models.enums import BatchEventType
+from brainrot_backend.core.storage.base import Repository
 
 
 class EventBroker:

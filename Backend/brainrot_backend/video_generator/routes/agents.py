@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Header, HTTPException, Request, Response
 from fastapi.responses import StreamingResponse
 
-from brainrot_backend.shared.models.api import AgentBootstrapResponse, WebhookAckResponse
-from brainrot_backend.shared.models.domain import ToolScriptBundlePayload
+from brainrot_backend.core.models.api import AgentBootstrapResponse, WebhookAckResponse
+from brainrot_backend.core.models.domain import ToolScriptBundlePayload
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents", tags=["agents"])

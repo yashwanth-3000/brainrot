@@ -16,7 +16,7 @@ import httpx
 from brainrot_backend.config import Settings
 from brainrot_backend.video_generator.integrations.elevenlabs import ElevenLabsAgentsClient
 from brainrot_backend.video_generator.producer_crewai import CrewAIProducerFlow
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     AgentRunRecord,
@@ -27,9 +27,9 @@ from brainrot_backend.shared.models.domain import (
     ScriptDraft,
     ToolScriptBundlePayload,
 )
-from brainrot_backend.shared.models.enums import AgentRole, BatchEventType
+from brainrot_backend.core.models.enums import AgentRole, BatchEventType
 from brainrot_backend.video_generator.services.events import EventBroker
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.storage.base import BlobStore, Repository
 
 logger = logging.getLogger(__name__)
 WORD_PATTERN = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*")

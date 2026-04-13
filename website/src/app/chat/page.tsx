@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Minus, Plus, Sparkles, User } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import { PromptInputBox, type PromptSendPayload, type ModeId } from "@/components/ui/ai-prompt-box";
 import Navbar from "@/components/ui/navbar";
 
@@ -52,7 +53,7 @@ export default function ChatPage() {
 }
 
 function ChatPageFallback() {
-  return <ChatPageInner requestedChatId={null} prefillPrompt="" />;
+  return <ChatPageInner requestedChatId={null} prefillPrompt="" authError={false} />;
 }
 
 function ChatPageContent() {
@@ -61,6 +62,7 @@ function ChatPageContent() {
     <ChatPageInner
       requestedChatId={searchParams.get("chat")}
       prefillPrompt={searchParams.get("prefill") ?? ""}
+      authError={searchParams.get("auth") === "error"}
     />
   );
 }
@@ -68,10 +70,13 @@ function ChatPageContent() {
 function ChatPageInner({
   requestedChatId,
   prefillPrompt,
+  authError,
 }: {
   requestedChatId: string | null;
   prefillPrompt: string;
+  authError: boolean;
 }) {
+  const auth = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [composerMode, setComposerMode] = useState<ModeId | null>(null);
@@ -99,6 +104,11 @@ function ChatPageInner({
   useEffect(() => {
     setDraftMessage(prefillPrompt);
   }, [prefillPrompt]);
+
+  useEffect(() => {
+    setChatSessionId(requestedChatId);
+    setMessages([]);
+  }, [auth.scopeKey, requestedChatId]);
 
   useEffect(() => {
     setBatchCount(readStoredBatchCount());
@@ -284,6 +294,43 @@ function ChatPageInner({
                 animate="show"
                 style={{ position: "relative", width: "100%", maxWidth: 680 }}
               >
+                {!auth.isAuthenticated ? (
+                  <div
+                    style={{
+                      marginBottom: 16,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 10,
+                      borderRadius: 999,
+                      border: "1px solid rgba(255,255,255,0.12)",
+                      background: "rgba(16,12,28,0.62)",
+                      padding: "10px 14px",
+                      color: "#d9d5ea",
+                      fontSize: 13,
+                    }}
+                  >
+                    <span style={{ fontWeight: 700, color: "#f0ecff" }}>{auth.libraryLabel}</span>
+                    <span>
+                      Skip login and generate into the shared general library, or sign in with Google for your own
+                      library.
+                    </span>
+                  </div>
+                ) : null}
+                {authError ? (
+                  <div
+                    style={{
+                      marginBottom: 16,
+                      borderRadius: 18,
+                      border: "1px solid rgba(255,145,113,0.35)",
+                      background: "rgba(95,36,28,0.55)",
+                      padding: "12px 14px",
+                      color: "#ffd8cf",
+                      fontSize: 13,
+                    }}
+                  >
+                    Google sign-in is not enabled on this Supabase project yet. Add the Google provider credentials in Supabase Auth and try again.
+                  </div>
+                ) : null}
                 <div
                   style={{
                     pointerEvents: "none",
@@ -406,7 +453,9 @@ function ChatPageInner({
                     footerAccessory={<BatchCountAccessory value={batchCount} onChange={setBatchCount} disabled={isLoading} />}
                   />
                   <p className={styles.inputDisclaimer}>
-                    Live chat generation currently runs the real backend pipeline for URLs and PDF uploads.
+                    {auth.isAuthenticated
+                      ? "Live chat generation saves to your account library."
+                      : "Live chat generation saves to the general guest library until you sign in."}
                   </p>
                 </div>
               </div>

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from brainrot_backend.shared.models.domain import WordTiming
+from brainrot_backend.core.models.domain import WordTiming
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,8 +10,8 @@ from typing import Any
 from crewai import Crew, Process
 
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import AnglePlan, GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
-from brainrot_backend.shared.models.enums import BatchEventType
+from brainrot_backend.core.models.domain import AnglePlan, GeneratedBundle, IngestedSource, ScriptDraft, SourceBrief
+from brainrot_backend.core.models.enums import BatchEventType
 from brainrot_backend.video_generator.producer_crewai.models import (
     CoveragePlan,
     CoverageSlotPlan,

@@ -12,8 +12,8 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.domain import IngestedSource
-from brainrot_backend.shared.models.enums import SourceKind
+from brainrot_backend.core.models.domain import IngestedSource
+from brainrot_backend.core.models.enums import SourceKind
 
 
 CONTENT_HINTS = (

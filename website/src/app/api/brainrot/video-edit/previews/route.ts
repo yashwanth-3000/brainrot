@@ -1,4 +1,4 @@
-import { buildBrainrotBackendUrl, relayJsonResponse } from "@/lib/brainrot-backend";
+import { buildBrainrotBackendUrl, buildBrainrotProxyHeaders, relayJsonResponse } from "@/lib/brainrot-backend";
 
 export const runtime = "nodejs";
 
@@ -8,9 +8,9 @@ export async function POST(request: Request) {
     method: "POST",
     body: payload,
     cache: "no-store",
-    headers: {
+    headers: await buildBrainrotProxyHeaders({
       "Content-Type": "application/json",
-    },
+    }),
   });
   return relayJsonResponse(upstream);
 }

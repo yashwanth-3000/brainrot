@@ -4,8 +4,8 @@ import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
-from brainrot_backend.shared.models.api import AssetUploadResponse
-from brainrot_backend.shared.models.enums import AssetKind
+from brainrot_backend.core.models.api import AssetUploadResponse
+from brainrot_backend.core.models.enums import AssetKind
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 

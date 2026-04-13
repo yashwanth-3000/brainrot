@@ -4,14 +4,15 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import uuid4
 
+from brainrot_backend.auth import RequestAuthContext
 from brainrot_backend.config import Settings
-from brainrot_backend.shared.models.api import BatchEnvelope
-from brainrot_backend.shared.models.domain import BatchItemRecord, BatchRecord, ScriptDraft
-from brainrot_backend.shared.models.enums import AgentRole, BatchEventType, BatchItemStatus, BatchStatus, SourceKind
+from brainrot_backend.core.models.api import BatchEnvelope
+from brainrot_backend.core.models.domain import BatchItemRecord, BatchRecord, ScriptDraft
+from brainrot_backend.core.models.enums import AgentRole, BatchEventType, BatchItemStatus, BatchStatus, SourceKind
 from brainrot_backend.video_generator.services.assets import sanitize_filename
 from brainrot_backend.recommendation_system.service import ChatService
 from brainrot_backend.video_generator.services.events import EventBroker
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.storage.base import BlobStore, Repository
 from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator
 
 
@@ -41,6 +42,7 @@ class BatchService:
     async def create_batch(
         self,
         *,
+        auth: RequestAuthContext,
         source_kind: SourceKind,
         source_url: str | None,
         count: int,
@@ -77,6 +79,7 @@ class BatchService:
         if chat_id:
             await self.chat_service.ensure_chat(
                 chat_id,
+                auth=auth,
                 title=title_hint,
                 source_label=title_hint,
                 source_url=source_url,
@@ -119,15 +122,18 @@ class BatchService:
         self._schedule(batch.id, retry_failed_only=False)
         return BatchEnvelope(batch=batch, items=items)
 
-    async def get_batch(self, batch_id: str) -> BatchEnvelope:
+    async def get_batch(self, batch_id: str, *, auth: RequestAuthContext | None = None) -> BatchEnvelope:
         batch = await self.repository.get_batch(batch_id)
         if batch is None:
             raise KeyError(batch_id)
+        if batch.chat_id:
+            await self.chat_service.get_accessible_chat(batch.chat_id, auth or RequestAuthContext())
         items = await self.repository.get_batch_items(batch_id)
         return BatchEnvelope(batch=batch, items=items)
 
-    async def retry_failed_items(self, batch_id: str) -> list[str]:
-        items = await self.repository.get_batch_items(batch_id)
+    async def retry_failed_items(self, batch_id: str, *, auth: RequestAuthContext | None = None) -> list[str]:
+        envelope = await self.get_batch(batch_id, auth=auth)
+        items = envelope.items
         failed = [item.id for item in items if item.status == BatchItemStatus.FAILED]
         if failed:
             self._schedule(batch_id, retry_failed_only=True)

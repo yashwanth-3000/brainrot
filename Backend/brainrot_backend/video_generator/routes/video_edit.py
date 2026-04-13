@@ -6,13 +6,13 @@ from urllib.parse import urlparse
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, RedirectResponse
 
-from brainrot_backend.shared.models.api import (
+from brainrot_backend.core.models.api import (
     SubtitlePresetOption,
     VideoEditOptionsResponse,
     VideoEditPreviewRequest,
     VideoEditPreviewResponse,
 )
-from brainrot_backend.shared.models.enums import AssetKind
+from brainrot_backend.core.models.enums import AssetKind
 from brainrot_backend.video_generator.render.subtitles import subtitle_presets
 from brainrot_backend.video_generator.services.assets import filter_allowed_gameplay_assets
 

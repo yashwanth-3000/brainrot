@@ -4,6 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import styles from './shorts-page.module.css'
+import { useAuth } from '@/components/auth/auth-provider'
 import Navbar from '@/components/ui/navbar'
 import { buildChatShortsPath, loadChatShorts, type StoredChatShort } from '@/lib/chat-run-storage'
 
@@ -160,6 +161,9 @@ function ShortsPageFallback() {
       recommendation={null}
       shorts={[]} libraryState="loading" shortsState="idle"
       error={null} onSelectChat={() => {}}
+      libraryLabel="General library"
+      isAuthenticated={false}
+      authError={false}
       sessionScopeId={null}
       onRetentionUpdate={() => {}}
     />
@@ -169,9 +173,13 @@ function ShortsPageFallback() {
 // ─── Data-fetching layer ──────────────────────────────────────────────────────
 
 function ShortsPageContent() {
+  const auth = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const requestedChatId = searchParams.get('chat')
+  const authError = searchParams.get('auth') === 'error'
+  const buildScopedShortsPath = (chatId: string) =>
+    authError ? `${buildChatShortsPath(chatId)}&auth=error` : buildChatShortsPath(chatId)
 
   const [chats, setChats] = useState<ChatSummary[]>([])
   const [selectedChatId, setSelectedChatId] = useState<string | null>(requestedChatId)
@@ -242,7 +250,14 @@ function ShortsPageContent() {
     }
     void loadChats()
     return () => ac.abort()
-  }, [])
+  }, [auth.scopeKey])
+
+  useEffect(() => {
+    setSelectedChatId(requestedChatId)
+    setSelectedChat(null)
+    setShorts([])
+    setRecommendation(null)
+  }, [auth.scopeKey, requestedChatId])
 
   useEffect(() => {
     if (libraryState === 'loading') return
@@ -250,8 +265,8 @@ function ShortsPageContent() {
     const next = requestedChatId || fallback
     if (!next) { setSelectedChatId(null); setSelectedChat(null); setShorts([]); setRecommendation(null); return }
     if (next !== selectedChatId) setSelectedChatId(next)
-    if (!requestedChatId && fallback) router.replace(buildChatShortsPath(fallback), { scroll: false })
-  }, [chats, libraryState, requestedChatId, router, selectedChatId])
+    if (!requestedChatId && fallback) router.replace(buildScopedShortsPath(fallback), { scroll: false })
+  }, [authError, chats, libraryState, requestedChatId, router, selectedChatId])
 
   useEffect(() => {
     if (!selectedChatId) {
@@ -330,10 +345,13 @@ function ShortsPageContent() {
 
   return (
     <ShortsShell
+      libraryLabel={auth.libraryLabel}
+      isAuthenticated={auth.isAuthenticated}
+      authError={authError}
       chats={chats} selectedChat={selectedChat} selectedChatId={selectedChatId}
       recommendation={recommendation}
       shorts={shorts} libraryState={libraryState} shortsState={shortsState}
-      error={error} onSelectChat={(id) => { setSelectedChatId(id); router.replace(buildChatShortsPath(id), { scroll: false }) }}
+      error={error} onSelectChat={(id) => { setSelectedChatId(id); router.replace(buildScopedShortsPath(id), { scroll: false }) }}
       sessionScopeId={recommendationSession?.chatId === selectedChatId ? recommendationSession.id : null}
       onRetentionUpdate={() => setRecommendationVersion(value => value + 1)}
     />
@@ -343,9 +361,15 @@ function ShortsPageContent() {
 // ─── Shell layout ─────────────────────────────────────────────────────────────
 
 function ShortsShell({
+  libraryLabel,
+  isAuthenticated,
+  authError,
   chats, selectedChat, selectedChatId, recommendation, shorts,
   libraryState, shortsState, error, onSelectChat, sessionScopeId, onRetentionUpdate,
 }: {
+  libraryLabel: string
+  isAuthenticated: boolean
+  authError: boolean
   chats: ChatSummary[]
   selectedChat: ChatSummary | null
   selectedChatId: string | null
@@ -373,14 +397,24 @@ function ShortsShell({
     if (typeof window === 'undefined') return
     const storedOpen = window.localStorage.getItem(INSIGHTS_OPEN_STORAGE_KEY)
     const storedWidth = window.localStorage.getItem(INSIGHTS_WIDTH_STORAGE_KEY)
-    if (storedOpen != null) {
-      setInsightsOpen(storedOpen !== '0')
-    }
-    if (storedWidth != null) {
+    const nextInsightsOpen = storedOpen != null ? storedOpen !== '0' : null
+    const nextInsightsWidth = (() => {
+      if (storedWidth == null) return null
       const parsed = Number(storedWidth)
-      if (Number.isFinite(parsed)) {
-        setInsightsWidth(clampInsightsWidth(parsed))
+      return Number.isFinite(parsed) ? clampInsightsWidth(parsed) : null
+    })()
+
+    const frame = window.requestAnimationFrame(() => {
+      if (nextInsightsOpen != null) {
+        setInsightsOpen(nextInsightsOpen)
       }
+      if (nextInsightsWidth != null) {
+        setInsightsWidth(nextInsightsWidth)
+      }
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
     }
   }, [])
 
@@ -438,8 +472,13 @@ function ShortsShell({
         {/* ── Sidebar ── */}
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <p className={styles.sidebarEyebrow}>Library</p>
-            <h1 className={styles.sidebarTitle}>Your shorts</h1>
+            <p className={styles.sidebarEyebrow}>{libraryLabel}</p>
+            <h1 className={styles.sidebarTitle}>{isAuthenticated ? 'Your shorts' : 'General shorts'}</h1>
+            {authError ? (
+              <p className={styles.sidebarStateCopy}>
+                Google sign-in is not enabled on this Supabase project yet. Add the Google provider credentials in Supabase Auth and try again.
+              </p>
+            ) : null}
           </div>
 
           <div className={styles.chatList}>
@@ -455,7 +494,11 @@ function ShortsShell({
             {libraryState === 'ready' && chats.length === 0 && (
               <div className={styles.sidebarStateCard}>
                 <p className={styles.sidebarStateTitle}>No shorts yet.</p>
-                <p className={styles.sidebarStateCopy}>Generate your first video in chat.</p>
+                <p className={styles.sidebarStateCopy}>
+                  {isAuthenticated
+                    ? 'Generate your first account-owned video in chat.'
+                    : 'Generate a video in guest mode to add it to the general library.'}
+                </p>
                 <Link href="/chat" className={styles.sidebarStateLink}>Open chat →</Link>
               </div>
             )}
@@ -513,6 +556,7 @@ function ShortsShell({
                     className={`${styles.feedViewport} ${isSwitchingChat ? styles.feedViewportSwitching : styles.feedViewportReady}`}
                   >
                     <ShortsFeed
+                      key={`${selectedChat?.id ?? selectedChatId ?? 'shorts-feed'}:${shorts.length}`}
                       chatId={selectedChat?.id ?? selectedChatId ?? ''}
                       shorts={shorts}
                       sessionScopeId={sessionScopeId}
@@ -577,7 +621,7 @@ function ShortsShell({
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>🎬</div>
                 <p className={styles.emptyTitle}>No videos yet</p>
-                <p className={styles.emptyCopy}>This chat hasn't exported any shorts. Start a run to generate videos.</p>
+                <p className={styles.emptyCopy}>This chat has not exported any shorts yet. Start a run to generate videos.</p>
                 <Link href="/chat" className={styles.emptyLink}>Go to chat →</Link>
               </div>
             ) : null}
@@ -748,7 +792,6 @@ function ShortsFeed({
   const touchStartRef = useRef(0)
 
   useEffect(() => {
-    setActiveIndex(0)
     lockedRef.current = false
   }, [chatId, shorts.length])
 
@@ -1277,11 +1320,15 @@ function ChatListCover({ chat }: { chat: ChatSummary }) {
   const [hasFailed, setHasFailed] = useState(false)
 
   useEffect(() => {
-    setIsReady(false)
-    setHasFailed(false)
+    const frame = window.requestAnimationFrame(() => {
+      setIsReady(false)
+      setHasFailed(false)
+    })
 
     if (coverThumbnailUrl || !coverUrl) {
-      return
+      return () => {
+        window.cancelAnimationFrame(frame)
+      }
     }
 
     const timeoutId = window.setTimeout(() => {
@@ -1289,6 +1336,7 @@ function ChatListCover({ chat }: { chat: ChatSummary }) {
     }, 4500)
 
     return () => {
+      window.cancelAnimationFrame(frame)
       window.clearTimeout(timeoutId)
     }
   }, [coverThumbnailUrl, coverUrl])

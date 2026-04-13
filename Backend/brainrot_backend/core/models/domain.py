@@ -6,12 +6,13 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from brainrot_backend.shared.models.enums import (
+from brainrot_backend.core.models.enums import (
     AgentRole,
     AssetKind,
     BatchEventType,
     BatchItemStatus,
     BatchStatus,
+    ChatLibraryScope,
     SourceKind,
 )
 
@@ -162,6 +163,8 @@ class AssetRecord(BaseModel):
 class ChatRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     title: str = "Untitled chat"
+    library_scope: ChatLibraryScope = ChatLibraryScope.GENERAL
+    owner_user_id: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
     last_source_label: str | None = None

@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
-from brainrot_backend.shared.models.domain import (
+from brainrot_backend.core.models.domain import (
     AgentConfigRecord,
     AgentConversationRecord,
     AgentRunRecord,
@@ -19,8 +19,8 @@ from brainrot_backend.shared.models.domain import (
     ScriptDraft,
     ShortEngagementRecord,
 )
-from brainrot_backend.shared.models.enums import AgentRole, AssetKind, BatchEventType
-from brainrot_backend.shared.storage.base import BlobStore, Repository
+from brainrot_backend.core.models.enums import AgentRole, AssetKind, BatchEventType, ChatLibraryScope
+from brainrot_backend.core.storage.base import BlobStore, Repository
 
 
 def utc_now() -> datetime:
@@ -53,8 +53,17 @@ class InMemoryRepository(Repository):
     async def get_chat(self, chat_id: str) -> ChatRecord | None:
         return self._chats.get(chat_id)
 
-    async def list_chats(self) -> list[ChatRecord]:
+    async def list_chats(
+        self,
+        *,
+        library_scope: ChatLibraryScope | None = None,
+        owner_user_id: str | None = None,
+    ) -> list[ChatRecord]:
         chats = list(self._chats.values())
+        if library_scope is not None:
+            chats = [chat for chat in chats if chat.library_scope == library_scope]
+        if owner_user_id is not None:
+            chats = [chat for chat in chats if chat.owner_user_id == owner_user_id]
         return sorted(chats, key=lambda chat: chat.updated_at, reverse=True)
 
     async def update_chat(self, chat_id: str, **changes: object) -> ChatRecord:

@@ -1,4 +1,4 @@
-import { buildBrainrotBackendUrl, relayJsonResponse } from "@/lib/brainrot-backend";
+import { buildBrainrotBackendUrl, buildBrainrotProxyHeaders, relayJsonResponse } from "@/lib/brainrot-backend";
 
 export const runtime = "nodejs";
 
@@ -16,6 +16,7 @@ export async function GET(
 
   const suffix = search.toString()
   const upstream = await fetch(buildBrainrotBackendUrl(`/v1/chats/${encodeURIComponent(chatId)}/recommendations${suffix ? `?${suffix}` : ""}`), {
+    headers: await buildBrainrotProxyHeaders(),
     cache: "no-store",
   });
   return relayJsonResponse(upstream);

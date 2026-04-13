@@ -3,12 +3,13 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, RedirectResponse
 from sse_starlette.sse import EventSourceResponse
 
-from brainrot_backend.shared.models.api import BatchEnvelope, BatchRetryResponse
-from brainrot_backend.shared.models.enums import SourceKind
+from brainrot_backend.auth import AuthConfigurationError, AuthenticationError
+from brainrot_backend.core.models.api import BatchEnvelope, BatchRetryResponse
+from brainrot_backend.core.models.enums import SourceKind
 
 router = APIRouter(prefix="/batches", tags=["batches"])
 
@@ -29,6 +30,7 @@ def _video_response_from_output_url(output_url: str):
 @router.post("", response_model=BatchEnvelope)
 async def create_batch(
     request: Request,
+    authorization: str | None = Header(default=None),
     source_url: str | None = Form(None),
     source_kind: SourceKind | None = Form(None),
     count: int = Form(...),
@@ -48,8 +50,10 @@ async def create_batch(
     payload = await file.read() if file is not None else None
 
     container = request.app.state.container
+    auth = await _resolve_auth_context(request, authorization=authorization)
     try:
         return await container.batch_service.create_batch(
+            auth=auth,
             source_kind=inferred_kind,
             source_url=source_url,
             count=count,
@@ -67,21 +71,36 @@ async def create_batch(
 
 
 @router.get("/{batch_id}", response_model=BatchEnvelope)
-async def get_batch(request: Request, batch_id: str) -> BatchEnvelope:
+async def get_batch(
+    request: Request,
+    batch_id: str,
+    authorization: str | None = Header(default=None),
+) -> BatchEnvelope:
     container = request.app.state.container
+    auth = await _resolve_auth_context(request, authorization=authorization)
     try:
-        return await container.batch_service.get_batch(batch_id)
+        return await container.batch_service.get_batch(batch_id, auth=auth)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Batch not found.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 @router.get("/{batch_id}/items/{item_id}/video")
-async def get_batch_item_video(request: Request, batch_id: str, item_id: str):
+async def get_batch_item_video(
+    request: Request,
+    batch_id: str,
+    item_id: str,
+    authorization: str | None = Header(default=None),
+):
     container = request.app.state.container
+    auth = await _resolve_auth_context(request, authorization=authorization)
     try:
-        envelope = await container.batch_service.get_batch(batch_id)
+        envelope = await container.batch_service.get_batch(batch_id, auth=auth)
     except KeyError:
         envelope = None
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
     if envelope is not None:
         item = next((candidate for candidate in envelope.items if candidate.id == item_id), None)
@@ -101,21 +120,40 @@ async def get_batch_item_video(request: Request, batch_id: str, item_id: str):
 
 
 @router.get("/{batch_id}/events")
-async def stream_events(request: Request, batch_id: str, last_event_id: str | None = None):
+async def stream_events(
+    request: Request,
+    batch_id: str,
+    last_event_id: str | None = None,
+    authorization: str | None = Header(default=None),
+):
     container = request.app.state.container
+    auth = await _resolve_auth_context(request, authorization=authorization)
+    try:
+        await container.batch_service.get_batch(batch_id, auth=auth)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="Batch not found.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     after_sequence = int(last_event_id) if last_event_id and last_event_id.isdigit() else 0
     generator = container.events.stream(batch_id, after_sequence=after_sequence)
     return EventSourceResponse(generator)
 
 
 @router.post("/{batch_id}/retry", response_model=BatchRetryResponse)
-async def retry_failed_items(request: Request, batch_id: str) -> BatchRetryResponse:
+async def retry_failed_items(
+    request: Request,
+    batch_id: str,
+    authorization: str | None = Header(default=None),
+) -> BatchRetryResponse:
     container = request.app.state.container
+    auth = await _resolve_auth_context(request, authorization=authorization)
     try:
-        retried = await container.batch_service.retry_failed_items(batch_id)
-        envelope = await container.batch_service.get_batch(batch_id)
+        retried = await container.batch_service.retry_failed_items(batch_id, auth=auth)
+        envelope = await container.batch_service.get_batch(batch_id, auth=auth)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Batch not found.") from exc
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     return BatchRetryResponse(batch=envelope.batch, retried_item_ids=retried)
 
 
@@ -130,3 +168,13 @@ def infer_source_kind(source_url: str | None, file: UploadFile | None) -> Source
     if path in {"", "/"}:
         return SourceKind.WEBSITE
     return SourceKind.ARTICLE
+
+
+async def _resolve_auth_context(request: Request, authorization: str | None):
+    container = request.app.state.container
+    try:
+        return await container.auth_service.resolve_request(authorization)
+    except AuthConfigurationError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AuthenticationError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc

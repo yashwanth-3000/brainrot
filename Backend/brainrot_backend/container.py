@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from brainrot_backend.auth import SupabaseAuthService
 from brainrot_backend.config import Settings
 from brainrot_backend.video_generator.integrations.elevenlabs import ElevenLabsAgentsClient
 from brainrot_backend.video_generator.integrations.firecrawl import FirecrawlClient
@@ -12,9 +13,9 @@ from brainrot_backend.video_generator.services.assets import AssetService
 from brainrot_backend.video_generator.services.batches import BatchService
 from brainrot_backend.recommendation_system.service import ChatService
 from brainrot_backend.video_generator.services.events import EventBroker
-from brainrot_backend.shared.storage.base import BlobStore, Repository
-from brainrot_backend.shared.storage.memory import InMemoryRepository, LocalBlobStore
-from brainrot_backend.shared.storage.supabase import SupabaseBlobStore, SupabaseRepository
+from brainrot_backend.core.storage.base import BlobStore, Repository
+from brainrot_backend.core.storage.memory import InMemoryRepository, LocalBlobStore
+from brainrot_backend.core.storage.supabase import SupabaseBlobStore, SupabaseRepository
 from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator
 
 
@@ -23,6 +24,7 @@ class ServiceContainer:
     settings: Settings
     repository: Repository
     blob_store: BlobStore
+    auth_service: SupabaseAuthService
     events: EventBroker
     asset_service: AssetService
     agent_service: AgentService
@@ -54,6 +56,7 @@ def build_container(settings: Settings) -> ServiceContainer:
 
     events = EventBroker(repository)
     firecrawl = FirecrawlClient(settings)
+    auth_service = SupabaseAuthService(settings)
     chat_service = ChatService(repository=repository)
     agent_service = AgentService(
         settings=settings,
@@ -86,6 +89,7 @@ def build_container(settings: Settings) -> ServiceContainer:
         settings=settings,
         repository=repository,
         blob_store=blob_store,
+        auth_service=auth_service,
         events=events,
         asset_service=asset_service,
         agent_service=agent_service,
