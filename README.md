@@ -385,8 +385,7 @@ The main backend logic lives in:
 │   ├── testsprite.md
 │   └── testsprite-mcp-issues-report.md
 ├── assets/
-├── data/
-└── testsprite_hackathon_video_script.md
+└── data/
 ```
 
 ## Quick Start

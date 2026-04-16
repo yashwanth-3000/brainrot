@@ -20,7 +20,6 @@ The raw TestSprite suites and reports are still stored with the parts of the pro
 
 Other supporting project-level files:
 
-- `testsprite_hackathon_video_script.md` — the narrative summary of the full testing journey
 - `testsprite/testsprite-mcp-issues-report.md` — the consolidated limitations/issues report
 
 ## Testing Coverage At A Glance
@@ -153,7 +152,6 @@ That is why we kept a separate issues report alongside this file. The product cl
   - `testsprite-mcp-test-report-recommendation-system-1.md` — verified recommendation run (`5/7`)
 - Supporting evidence for the broken first attempt lives in:
   - `testsprite/testsprite-mcp-issues-report.md`
-  - `testsprite_hackathon_video_script.md`
 
 ### Video generator
 

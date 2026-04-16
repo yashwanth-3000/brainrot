@@ -6,6 +6,8 @@ import styles from './about.module.css'
 import Link from 'next/link'
 
 const TRANSITION_MS = 680
+const MARKETING_VIDEO_BASE =
+  'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/marketing'
 
 type SectionDef = {
   n: string
@@ -28,7 +30,7 @@ const sections: SectionDef[] = [
     accent: '#5235ef',
     bg: 'linear-gradient(160deg, #0d0b1e 0%, #180e40 100%)',
     caption: 'The format you already know',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/0c06a7db-62c8-44a7-a679-e63508338b77/d59acbcc-3309-42b5-a04d-2de36edfa85c.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-00-20260416.mp4`,
     pullquote: 'The same format that made you watch six hours of gameplay clips can make you actually learn something. We just had to build the machine.',
     body: [
       <>People will sit through a five-minute breakdown of quantum computing delivered over Minecraft parkour. They won&apos;t open the paper it&apos;s based on. We didn&apos;t set out to exploit that. We set out to <strong>point it at something worth knowing.</strong></>,
@@ -42,7 +44,7 @@ const sections: SectionDef[] = [
     accent: '#f97316',
     bg: 'linear-gradient(160deg, #100c04 0%, #1f1503 100%)',
     caption: 'URL → clean markdown',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/6e63fbf2-065f-4d01-8345-b03d3b02bfd8/595bbc73-7f79-4fd2-95ba-4cdfa988b2e1.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-01-20260416.mp4`,
     logo: (
       <svg xmlns="http://www.w3.org/2000/svg" width="18" height="26" fill="none" viewBox="0 0 50 72">
         <path fill="#fa5d19" d="M41.715 23.193c-2.762.82-4.844 2.675-6.37 4.69-.327.432-1.01.107-.88-.423 2.92-12.007-.937-21.986-12.961-26.898a.803.803 0 0 0-1.085.937c5.47 21.961-17.537 20.109-14.63 45.005.05.427-.43.72-.78.47-1.09-.782-2.307-2.415-3.142-3.562a.502.502 0 0 0-.887.16c-.665 2.404-.98 4.67-.98 6.92 0 8.749 4.497 16.45 11.304 20.915.39.255.89-.11.758-.557a13.5 13.5 0 0 1-.563-3.697c0-.788.05-1.593.173-2.343.285-1.885.94-3.68 2.04-5.314 3.772-5.663 11.334-11.132 10.127-18.56-.078-.47.477-.78.827-.457 5.328 4.868 6.383 11.415 5.508 17.287-.075.51.564.782.887.382a11.6 11.6 0 0 1 2.892-2.587c.27-.168.63-.04.733.26.602 1.752 1.497 3.397 2.342 5.042a13.46 13.46 0 0 1 .905 9.982.502.502 0 0 0 .755.57C45.5 66.95 50 59.248 50 50.494c0-3.043-.532-6.025-1.54-8.82-2.112-5.862-7.472-10.264-6.117-17.904.065-.365-.273-.682-.628-.577" />
@@ -60,7 +62,7 @@ const sections: SectionDef[] = [
     accent: '#6c47ff',
     bg: 'linear-gradient(160deg, #080612 0%, #120d2a 100%)',
     caption: 'Sections → slots → QA',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/807ce865-dd3d-4a50-b071-cae1f731bb35/76ccf926-c627-468a-b9e6-c44d1afa0074.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-02-20260416.mp4`,
     body: [
       <>Once the source text is ingested, it does not go straight into one giant summary prompt. The backend first hands the markdown to <strong>CrewAI</strong>, which splits it into meaningful sections, plans coverage, and assigns each short a different section plus a different angle family so the batch actually spreads across the source.</>,
       <>Each planned slot is then written with <strong>OpenAI</strong>. The model gets the local section context, the angle it needs to hit, the pacing target, and grounding constraints. The result is not one generic recap, but a structured batch of scripts tuned for <strong>25–30 second videos</strong> that each sound distinct.</>,
@@ -74,7 +76,7 @@ const sections: SectionDef[] = [
     accent: '#8b5cf6',
     bg: 'linear-gradient(160deg, #06050f 0%, #0e0a20 100%)',
     caption: 'ElevenLabs TTS → timed subtitle track',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/5e11c26b-9de3-40a5-b925-1a087181fc20/88870a71-9393-42d5-a40a-238e8b177dbb.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-03-20260416.mp4`,
     body: [
       <>Once a script clears QA, Draftr runs the narration through <strong>ElevenLabs TTS by default</strong>. Each short gets a narrator voice selected up front, and if that voice returns bad audio, the backend can automatically retry with the <strong>default voice</strong> instead of killing the whole render.</>,
       <>The returned audio already includes <strong>word-level timing data</strong>. Draftr stores that alignment, turns the timed words into an animated <strong>Advanced SubStation Alpha (.ass)</strong> subtitle track, and picks the subtitle preset that best fits the gameplay energy. By the time the final encode starts, the voiceover and captions are already locked together.</>,
@@ -87,7 +89,7 @@ const sections: SectionDef[] = [
     accent: '#10b981',
     bg: 'linear-gradient(160deg, #030f09 0%, #061a10 100%)',
     caption: '9:16 · libass · sidechain',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/7485cfb7-71cb-45a2-98ec-2a7e2a2190ee/4a2e460d-8c50-4cbc-9333-de018fdbd2a4.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-04-20260416.mp4`,
     body: [
       <>The final step is assembly. The renderer takes three inputs (<strong>gameplay video</strong>, <strong>narration audio</strong>, and the generated <strong>.ass subtitle file</strong>) and runs them through a single <strong>FFmpeg encode pass</strong>. The gameplay clip is cropped and scaled to fill a <strong>9:16 vertical frame</strong>. The narration audio goes on the primary audio track.</>,
       <>The subtitle track is burned directly into the video using <strong>libass</strong> during the encode pass. The final file is a <strong>self-contained MP4</strong>. It goes straight to <strong>Supabase storage</strong> and the public URL is returned to the orchestrator. A batch of <strong>ten videos generates in about three minutes</strong> from the moment ingestion completes.</>,
@@ -100,7 +102,7 @@ const sections: SectionDef[] = [
     accent: '#26c281',
     bg: 'linear-gradient(160deg, #03110b 0%, #062118 100%)',
     caption: 'Guest library → personal library',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/88ac3031-e07f-4758-b7e1-7c7184428835/db2a5332-de5c-4396-b4b1-ffd9e3775a1e.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-05-20260416.mp4`,
     pullquote: 'The same generator works in both modes. Auth only changes who owns the history.',
     logo: (
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
@@ -120,7 +122,7 @@ const sections: SectionDef[] = [
     accent: '#ff9f43',
     bg: 'linear-gradient(160deg, #120904 0%, #251003 100%)',
     caption: 'UI + API + auth + render verification',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/a84b8571-1777-466a-a822-74eabf6a1723/f69a44c5-d8b5-4dad-bf54-88993ee0badf.mp4',
+    videoUrl: `${MARKETING_VIDEO_BASE}/about-06-20260416.mp4`,
     pullquote: 'The goal is not one happy-path demo. The goal is to keep the whole machine honest.',
     logo: (
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
@@ -146,14 +148,29 @@ function DummyPhone({ section, offset, isActive, muted, onToggleMute }: {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [playing, setPlaying] = useState(false)
 
-  // sync play/pause on active change
+  // Keep the active slide playing as soon as the browser has enough data.
   useEffect(() => {
     const v = videoRef.current
     if (!v) return
-    if (isActive) {
+
+    const tryPlay = () => {
+      if (!isActive) return
       v.play().catch(() => {})
+    }
+
+    if (isActive) {
+      if (v.readyState >= 2) {
+        tryPlay()
+      }
+      v.addEventListener('loadeddata', tryPlay)
+      v.addEventListener('canplay', tryPlay)
     } else {
       v.pause()
+    }
+
+    return () => {
+      v.removeEventListener('loadeddata', tryPlay)
+      v.removeEventListener('canplay', tryPlay)
     }
   }, [isActive])
 
@@ -195,7 +212,8 @@ function DummyPhone({ section, offset, isActive, muted, onToggleMute }: {
               ref={videoRef}
               className={styles.dummyVideo}
               src={section.videoUrl}
-              muted
+              autoPlay
+              muted={muted}
               loop
               playsInline
               preload="auto"

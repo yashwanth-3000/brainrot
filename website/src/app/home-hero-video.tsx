@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 const heroVideoUrl =
-  'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/fc0ee706-feb5-4663-93c2-eb7851491944/dd57cb4a-1079-4b49-85e9-6a8824e62b7d.mp4'
+  'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/marketing/home-hero-20260416.mp4'
 
 export default function HomeHeroVideo() {
   const [muted, setMuted] = useState(true)

@@ -4,6 +4,8 @@
 **Date:** 2026-04-14  
 **Test Suites Run:** 4 (Frontend deployed, Video Generator, Recommendation System, Full Backend)
 
+This report retains all listed items as valid TestSprite/MCP issues or workflow limitations encountered during testing, including Issues 4, 5, 6, and 8.
+
 ---
 
 ## 1. Code Generation Ignores Explicit Response Shape Instructions
@@ -150,7 +152,7 @@ The second probe always succeeds. This adds ~3 seconds of unnecessary delay to e
 
 ## 8. No Way to Provide Exact Test Code
 
-**Severity:** Medium — architectural limitation
+**Severity:** Medium
 
 TestSprite generates test code from descriptions. There is no mechanism to provide exact test code to run. When the code generator makes mistakes (wrong paths, wrong field names, wrong content types), the only recourse is to make the description more explicit and re-run — consuming credits and time.
 
@@ -181,4 +183,4 @@ For the chat `response.json()["chat"]["id"]` issue, we ran 5 separate attempts a
 | Wrong content-type (JSON vs form-data) | High | Yes — explicit instruction | ~10 |
 | Empty code / silent timeout | High | Retry after clearing tmp/ | ~7 |
 | Tunnel 503 on first probe | Low | Auto-recovers | 0 |
-| No exact test code mechanism | Medium | N/A — design limitation | N/A |
+| No exact test code mechanism | Medium | N/A | N/A |
