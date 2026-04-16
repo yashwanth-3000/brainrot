@@ -1,0 +1,21 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "backend",
+  "localEndpoint": "http://localhost:8000/",
+  "serverPort": 51070,
+  "executionArgs": {
+    "projectName": "video-generator-test-2",
+    "projectPath": "/Users/yashwanthkrishna/Desktop/Drafter/Backend/brainrot_backend/video_generator",
+    "testIds": [
+      "TC009",
+      "TC010"
+    ],
+    "additionalInstruction": "ABSOLUTELY CRITICAL: The POST /v1/chats response is a NESTED JSON object. To get the chat ID you MUST use: chat_id = response.json()['chat']['id']. DO NOT use response.json()['chat_id'] — that key DOES NOT EXIST. The response shape is: {\"chat\": {\"id\": \"uuid\", \"title\": \"...\"}}. GET /v1/chats returns {\"items\": [{\"id\": \"...\"}]}. POST /v1/chats/{chat_id}/engagement requires JSON body with item_id, viewer_id, session_id (all strings). Response: {\"engagement\": {\"id\": \"...\"}}.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-v2EbfgfRfkDjY5Y44VOeEUccldtpbWPaZ-RVRy_VBKxgjtjblR3lYnufHr5UG0qM261BWKOS0kN9d9HRD9zcKWAAIUvR-ZAHndi0SyRlP9KRi8WSw_UYC8ViM0XZd9F2vOs"
+    }
+  },
+  "proxy": "http://06242995-f250-4b06-bf18-890569914fff:jzG0FWgLKRjlSrNwgzeYgLtchrSju9w2@tun.testsprite.com:8080"
+}

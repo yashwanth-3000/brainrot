@@ -55,29 +55,29 @@ const sections: SectionDef[] = [
   },
   {
     n: '02',
-    label: 'Script generation · OpenAI + backend QA',
-    title: 'A script pipeline that writes for the ear.',
+    label: 'Script generation · CrewAI + OpenAI + backend QA',
+    title: 'CrewAI maps the source before a single line gets written.',
     accent: '#6c47ff',
     bg: 'linear-gradient(160deg, #080612 0%, #120d2a 100%)',
-    caption: 'Prompt → scripts → QA',
+    caption: 'Sections → slots → QA',
     videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/807ce865-dd3d-4a50-b071-cae1f731bb35/76ccf926-c627-468a-b9e6-c44d1afa0074.mp4',
     body: [
-      <>Once the source text is ingested, it goes to the <strong>Producer stage</strong>. The backend sends the cleaned brief to <strong>OpenAI</strong>, which returns a structured bundle of candidate scripts. Each script includes a title, hook line, narration text, caption text, estimated duration, visual beat notes, gameplay tags, music tags, and the source facts it used.</>,
-      <>The goal is not one generic summary. The Producer generates up to <strong>fifteen scripts per batch</strong>, each covering a different angle of the source material. Every narration text must land inside a configured word range targeting <strong>25–30 second videos</strong>.</>,
-      <>After generation, the backend runs a <strong>local QA and repair pass</strong>. It checks hook grounding, duplicate ideas, schema shape, pacing, and word counts. If a script bundle fails validation, the backend sends the errors back for repair and retries up to <strong>three times</strong> before isolating the remaining failed slots and continuing independently.</>,
+      <>Once the source text is ingested, it does not go straight into one giant summary prompt. The backend first hands the markdown to <strong>CrewAI</strong>, which splits it into meaningful sections, plans coverage, and assigns each short a different section plus a different angle family so the batch actually spreads across the source.</>,
+      <>Each planned slot is then written with <strong>OpenAI</strong>. The model gets the local section context, the angle it needs to hit, the pacing target, and grounding constraints. The result is not one generic recap, but a structured batch of scripts tuned for <strong>25–30 second videos</strong> that each sound distinct.</>,
+      <>After writing, the backend runs a <strong>QA and repair pass</strong> for overlap, stale hook phrasing, schema shape, pacing, and grounded claims. Failed slots are repaired and retried up to <strong>three passes</strong>, so one weak script does not stall the rest of the bundle.</>,
     ],
   },
   {
     n: '03',
-    label: 'Narration + alignment · ElevenLabs Agent',
-    title: 'Every word, timestamped to the millisecond.',
+    label: 'Narration + subtitle timing · ElevenLabs',
+    title: 'The audio comes back with timing, so the captions are already in sync.',
     accent: '#8b5cf6',
     bg: 'linear-gradient(160deg, #06050f 0%, #0e0a20 100%)',
-    caption: 'Word-level forced alignment',
-    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/f68c8bf6-d28f-4a39-b0bc-04eadb511206/2a682f90-f495-4900-b4c7-65c6f4442f70.mp4',
+    caption: 'ElevenLabs TTS → timed subtitle track',
+    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/5e11c26b-9de3-40a5-b925-1a087181fc20/88870a71-9393-42d5-a40a-238e8b177dbb.mp4',
     body: [
-      <>With scripts in hand, the orchestrator calls the <strong>Narrator</strong>. This is a <strong>second ElevenLabs agent</strong>, separate from the Producer, whose job is to convert the narration text into audio and return <strong>word-level timestamps</strong>. Every word in the output has a precise start time and end time in milliseconds, produced by <strong>ElevenLabs&apos; forced alignment system</strong> running over the generated audio.</>,
-      <>The word timings are then passed directly into the <strong>subtitle generator</strong>, which builds an <strong>Advanced SubStation Alpha (.ass) track</strong>, the same subtitle format used in professional anime fansubs and broadcast production. Unlike SRT captions that just display text at timestamps, ASS supports <strong>per-word animation effects</strong>. Draftr ships with five subtitle presets: a karaoke-style sweep, and four single-word-pop variants using the Komika, Bebas Neue, Anton, and Lilita One typefaces.</>,
+      <>Once a script clears QA, Draftr runs the narration through <strong>ElevenLabs TTS by default</strong>. Each short gets a narrator voice selected up front, and if that voice returns bad audio, the backend can automatically retry with the <strong>default voice</strong> instead of killing the whole render.</>,
+      <>The returned audio already includes <strong>word-level timing data</strong>. Draftr stores that alignment, turns the timed words into an animated <strong>Advanced SubStation Alpha (.ass)</strong> subtitle track, and picks the subtitle preset that best fits the gameplay energy. By the time the final encode starts, the voiceover and captions are already locked together.</>,
     ],
   },
   {
@@ -91,6 +91,46 @@ const sections: SectionDef[] = [
     body: [
       <>The final step is assembly. The renderer takes three inputs (<strong>gameplay video</strong>, <strong>narration audio</strong>, and the generated <strong>.ass subtitle file</strong>) and runs them through a single <strong>FFmpeg encode pass</strong>. The gameplay clip is cropped and scaled to fill a <strong>9:16 vertical frame</strong>. The narration audio goes on the primary audio track.</>,
       <>The subtitle track is burned directly into the video using <strong>libass</strong> during the encode pass. The final file is a <strong>self-contained MP4</strong>. It goes straight to <strong>Supabase storage</strong> and the public URL is returned to the orchestrator. A batch of <strong>ten videos generates in about three minutes</strong> from the moment ingestion completes.</>,
+    ],
+  },
+  {
+    n: '05',
+    label: 'Authentication + library · Supabase + Google',
+    title: 'Guest mode stays instant. Login turns the generator into your own archive.',
+    accent: '#26c281',
+    bg: 'linear-gradient(160deg, #03110b 0%, #062118 100%)',
+    caption: 'Guest library → personal library',
+    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/88ac3031-e07f-4758-b7e1-7c7184428835/db2a5332-de5c-4396-b4b1-ffd9e3775a1e.mp4',
+    pullquote: 'The same generator works in both modes. Auth only changes who owns the history.',
+    logo: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
+        <path fill="#26c281" d="M12 2a5 5 0 0 1 5 5v1.1a3.9 3.9 0 0 1 2.8 3.75v6.3A3.85 3.85 0 0 1 15.95 22H8.05A3.85 3.85 0 0 1 4.2 18.15v-6.3A3.9 3.9 0 0 1 7 8.1V7a5 5 0 0 1 5-5m0 2.1A2.9 2.9 0 0 0 9.1 7v1h5.8V7A2.9 2.9 0 0 0 12 4.1M12 11a1.8 1.8 0 0 0-1.8 1.8c0 .68.37 1.27.93 1.58v1.82h1.9v-1.82A1.8 1.8 0 0 0 12 11"/>
+      </svg>
+    ),
+    body: [
+      <>Draftr now supports <strong>Supabase authentication with Google login</strong>. If you want to try the product fast, you can keep moving in guest mode and generate into the <strong>general library</strong> without creating an account.</>,
+      <>The moment you sign in, the same workflow becomes personal. New chats, rendered MP4s, reruns, and saved shorts are scoped to <strong>your account</strong>, so your library becomes a private archive instead of a shared feed.</>,
+      <>That split keeps the product simple. Guests get instant access, while logged-in users get ownership, persistence, and a cleaner place to revisit everything they have generated later.</>,
+    ],
+  },
+  {
+    n: '06',
+    label: 'Testing + QA · TestSprite',
+    title: 'We pressure-test the full workflow before users ever feel the regression.',
+    accent: '#ff9f43',
+    bg: 'linear-gradient(160deg, #120904 0%, #251003 100%)',
+    caption: 'UI + API + auth + render verification',
+    videoUrl: 'https://bblxxjxelituczzebbip.supabase.co/storage/v1/object/public/final-renders/a84b8571-1777-466a-a822-74eabf6a1723/f69a44c5-d8b5-4dad-bf54-88993ee0badf.mp4',
+    pullquote: 'The goal is not one happy-path demo. The goal is to keep the whole machine honest.',
+    logo: (
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24">
+        <path fill="#ff9f43" d="M12 2.4 20.2 7v10L12 21.6 3.8 17V7L12 2.4Zm0 2.32L5.8 8.21v7.58L12 19.28l6.2-3.49V8.2L12 4.73Zm3.64 4.41-4.32 4.96-2.96-2.47-1.23 1.48 4.37 3.63 5.56-6.38-1.42-1.2Z"/>
+      </svg>
+    ),
+    body: [
+      <>We use <strong>TestSprite</strong> as an AI-native testing layer for the product. It plans and executes end-to-end UI, API, and workflow checks, then returns the kind of evidence that matters when something breaks: <strong>reports, logs, screenshots, videos, and fix guidance</strong>.</>,
+      <>In practice that means the <strong>video generator</strong>, the <strong>recommendation system</strong>, the <strong>authentication flow</strong>, Supabase-backed storage, and the rest of the backend path are tested as separate systems instead of only through one polished demo path.</>,
+      <>For critical flows, we repeat the runs across multiple passes, <strong>five times over when needed</strong>, so regressions get caught early and fixes can be verified before the website ships them to real users.</>,
     ],
   },
 ]

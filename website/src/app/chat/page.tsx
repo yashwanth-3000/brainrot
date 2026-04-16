@@ -328,7 +328,7 @@ function ChatPageInner({
                       fontSize: 13,
                     }}
                   >
-                    Google sign-in is not enabled on this Supabase project yet. Add the Google provider credentials in Supabase Auth and try again.
+                    Google sign-in did not complete. Try the login flow again, and if it still fails, reopen the login page and retry from there.
                   </div>
                 ) : null}
                 <div

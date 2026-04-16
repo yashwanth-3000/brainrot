@@ -48,6 +48,31 @@ export async function buildBrainrotProxyHeaders(headers?: HeadersInit): Promise<
   return nextHeaders;
 }
 
+export function buildVideoRelayResponse(upstream: Response, fallbackContentType: string): Response {
+  const headers = new Headers({
+    "Cache-Control": "no-store",
+    "Content-Type": upstream.headers.get("content-type") ?? fallbackContentType,
+  });
+
+  for (const headerName of [
+    "accept-ranges",
+    "content-length",
+    "content-range",
+    "etag",
+    "last-modified",
+  ]) {
+    const value = upstream.headers.get(headerName);
+    if (value) {
+      headers.set(headerName, value);
+    }
+  }
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers,
+  });
+}
+
 export async function relayJsonResponse(upstream: Response): Promise<Response> {
   const payload = await upstream.text();
   return new Response(payload || "{}", {

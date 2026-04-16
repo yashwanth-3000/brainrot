@@ -1,0 +1,52 @@
+[
+  {
+    "id": "TC001",
+    "title": "post_v1_batches_create_batch_with_form_data",
+    "description": "Test creating a batch video generation job. IMPORTANT: POST /v1/batches uses multipart/form-data (NOT JSON). Required form fields: 'source_url' (string) and 'count' (int, 5-15). Use requests.post(url, data={'source_url': 'https://example.com', 'count': '5'}). Response is JSON envelope: {'batch': {'id': '...', 'status': 'queued', ...}, 'items': [...]}. Verify response status 200, response.json()['batch']['id'] is a non-empty UUID string, response.json()['items'] is a list."
+  },
+  {
+    "id": "TC002",
+    "title": "get_v1_batches_batchid_events_sse_stream",
+    "description": "Test SSE streaming from GET /v1/batches/{batch_id}/events. First create a batch via POST /v1/batches with form data={'source_url': 'https://example.com', 'count': '5'}, extract batch_id from response.json()['batch']['id']. Then GET /v1/batches/{batch_id}/events with headers={'Accept': 'text/event-stream'} and stream=True. DO NOT import sseclient — parse SSE manually by iterating response.iter_lines() and looking for lines starting with 'data:'. Verify the connection succeeds with status 200 and content-type contains 'text/event-stream'. Read a few events (with a 10 second timeout) then close."
+  },
+  {
+    "id": "TC003",
+    "title": "post_v1_batches_invalid_input_validation",
+    "description": "Test POST /v1/batches input validation using form-data. Test cases: (1) empty form data={} should return 422, (2) data={'source_url': 'http://example.com', 'count': '4'} should return 422 (count below 5), (3) data={'source_url': 'http://example.com', 'count': '16'} should return 422 (count above 15), (4) data={'count': '5'} with no source_url and no file should return 422. All requests use requests.post(url, data=...) with form data, NOT JSON."
+  },
+  {
+    "id": "TC004",
+    "title": "get_v1_batches_batchid_uuid_validation_and_not_found",
+    "description": "Test GET /v1/batches/{batch_id} with invalid and non-existent IDs. Test case 1: GET /v1/batches/not-a-uuid-string should return 422 (invalid UUID format validation). Test case 2: GET /v1/batches/00000000-0000-0000-0000-000000000000 should return 404 (valid UUID but batch does not exist). Verify both status codes and that response body is valid JSON with 'detail' key."
+  },
+  {
+    "id": "TC005",
+    "title": "post_v1_assets_upload_file",
+    "description": "Test file upload via POST /v1/assets/upload (note: path is /v1/assets/upload, NOT /v1/assets). This endpoint requires multipart form data with: 'file' (UploadFile), 'kind' (required enum string: 'gameplay' or 'music' or 'font'), 'tags' (optional comma-separated string), 'metadata_json' (optional JSON string, default '{}'). Example: requests.post(url, files={'file': ('test.mp4', b'fake-content', 'video/mp4')}, data={'kind': 'gameplay', 'tags': 'test', 'metadata_json': '{}'}). Response: {'asset': {'id': '...', 'kind': 'gameplay', 'bucket': '...', 'path': '...', ...}}. Verify status 200, response.json()['asset']['id'] exists, response.json()['asset']['kind'] matches."
+  },
+  {
+    "id": "TC006",
+    "title": "post_v1_assets_upload_missing_required_fields",
+    "description": "Test POST /v1/assets/upload with missing required fields. Test case 1: POST with file but no 'kind' field — should return 422 because 'kind' is required. Use requests.post(url, files={'file': ('test.mp4', b'content', 'video/mp4')}, data={}). Test case 2: POST with 'kind' but no file — should return 422. Use requests.post(url, data={'kind': 'gameplay'}). Test case 3: POST with invalid kind value — requests.post(url, files={'file': ('t.mp4', b'x', 'video/mp4')}, data={'kind': 'invalid_kind'}) — should return 422."
+  },
+  {
+    "id": "TC007",
+    "title": "post_v1_agents_bootstrap",
+    "description": "Test POST /v1/agents/bootstrap to bootstrap ElevenLabs agents. Send POST to /v1/agents/bootstrap with no body. Response: {'agents': [...], 'tool_ids': [...]}. Verify status 200, response.json()['agents'] is a list, response.json()['tool_ids'] is a list. Each agent in 'agents' should have 'id', 'role', 'name', 'agent_id' fields."
+  },
+  {
+    "id": "TC008",
+    "title": "post_v1_agents_webhooks_elevenlabs",
+    "description": "Test POST /v1/agents/webhooks/elevenlabs (note: plural 'webhooks', NOT 'webhook'). The webhook requires a signature header. The server checks for header names: 'elevenlabs-signature' or 'x-elevenlabs-signature' or 'signature'. Test case 1: POST with missing signature header should return 400 with detail 'Missing ElevenLabs webhook signature header.' Test case 2: POST with a fake signature header 'elevenlabs-signature: fake_sig' and a JSON body should return 400 (signature verification will fail). Verify both status codes."
+  },
+  {
+    "id": "TC009",
+    "title": "post_v1_chats_create_and_list",
+    "description": "Test chat creation and listing. Step 1: POST /v1/chats with JSON body {'title': 'Test Chat'}. Response envelope: {'chat': {'id': '...', 'title': '...', ...}}. Extract chat_id from response.json()['chat']['id'] (NOT response.json()['chat_id']). Step 2: GET /v1/chats to list all chats. Response: {'items': [...]}. Verify the created chat appears in response.json()['items'] by matching the chat id. Step 3: GET /v1/chats/{chat_id} to retrieve single chat. Response: {'chat': {'id': '...', ...}}. Verify response.json()['chat']['id'] matches."
+  },
+  {
+    "id": "TC010",
+    "title": "post_v1_chats_chatid_engagement",
+    "description": "Test engagement tracking. Step 1: Create a chat via POST /v1/chats with JSON body {'title': 'Engagement Test'}. Extract chat_id from response.json()['chat']['id']. Step 2: POST /v1/chats/{chat_id}/engagement with JSON body: {'item_id': '<any-uuid-string>', 'viewer_id': '<any-uuid-string>', 'session_id': '<any-uuid-string>', 'watch_time_seconds': 30.0, 'completion_ratio': 0.75, 'liked': true}. Note: 'item_id', 'viewer_id', 'session_id' are REQUIRED string fields. Response: {'engagement': {'id': '...', ...}}. Verify status 200. Step 3: Test with non-existent chat_id (use a valid UUID like '00000000-0000-0000-0000-000000000000'): should return 404. Step 4: Test with missing required field 'item_id': should return 422."
+  }
+]

@@ -1,0 +1,123 @@
+project:
+  name: brainrot-backend
+  description: FastAPI backend service for generating short-form brainrot gameplay reels from URLs and PDFs. Handles ingestion, AI scripting, TTS narration, subtitle rendering, FFmpeg video compositing, and recommendation analytics.
+  language: Python 3.12
+  framework: FastAPI + Uvicorn
+  architecture: Layered (routes → services → workers → integrations/render)
+
+tech_stack:
+  - FastAPI (REST API)
+  - Pydantic / Pydantic-Settings (validation & config)
+  - OpenAI API (script generation via CrewAI or direct)
+  - ElevenLabs API (TTS narration, agent-based producer)
+  - Firecrawl API (URL/site/PDF ingestion)
+  - Supabase (Postgres + blob storage, optional)
+  - FFmpeg (video compositing, 1080×1920 H.264+AAC)
+  - CrewAI (multi-agent LLM workflow for script production)
+  - SSE (Server-Sent Events for live batch progress)
+  - pytest (unit/integration tests)
+
+modules:
+  video_generator:
+    description: End-to-end pipeline from source ingestion to rendered MP4 upload
+    routes:
+      - path: /v1/batches
+        methods: [POST, GET]
+        description: Create batches, stream SSE events, retry failed items, get item video
+      - path: /v1/assets
+        methods: [POST]
+        description: Upload gameplay/music/font assets
+      - path: /v1/agents
+        methods: [POST]
+        description: Bootstrap ElevenLabs agents, proxy LLM calls, handle webhooks
+      - path: /v1/video-edit
+        methods: [GET, POST]
+        description: Preview render editor (options + preview generation)
+    services:
+      - BatchService: create_batch, get_batch, retry_failed_items, create_video_edit_preview
+      - AgentService: run_producer, narrate_item, bootstrap_agents, submit_script_bundle, handle_elevenlabs_webhook, forward_custom_llm_request
+      - AssetService: upload_asset, list_assets, auto_seed_gameplay_assets, auto_seed_font_assets
+      - EventBroker: publish, stream (SSE backing store)
+    workers:
+      - BatchOrchestrator: run_batch, run_preview, _render_item, _finalize_batch
+    render:
+      - FFmpegRenderer: render (with/without music), _build_command_with_music, _build_command_without_music
+      - SubtitlePreset: karaoke_sweep, single_word_pop, single_word_pop_bebas, single_word_pop_anton, single_word_pop_lilita
+      - AssetSelector: choose_gameplay, choose_music (tag-based scoring + stable hash tie-break)
+    integrations:
+      - FirecrawlClient: ingest URL/site/PDF → IngestedSource
+      - ElevenLabsAgentsClient: TTS narration, producer agent, word alignment
+      - OpenAIStructuredClient: structured output generation (direct_openai mode)
+    producer_crewai:
+      - CrewAIProducerFlow: sectioning → writer crew → repair crew → GeneratedBundle
+      - Sectioning: build_coverage_plan, build_source_brief_metadata
+
+  recommendation_system:
+    description: Chat/session management, short engagement tracking, and retention-based recommendation analytics
+    routes:
+      - path: /v1/chats
+        methods: [POST, GET]
+        description: Create and list chats (auth-scoped: user or general library)
+      - path: /v1/chats/{chat_id}
+        methods: [GET]
+        description: Get a single chat with summary
+      - path: /v1/chats/{chat_id}/shorts
+        methods: [GET]
+        description: List generated shorts (items) for a chat
+      - path: /v1/chats/{chat_id}/engagement
+        methods: [POST]
+        description: Submit viewer engagement (watch time, likes, mute, skipped, etc.)
+      - path: /v1/chats/{chat_id}/recommendations
+        methods: [GET]
+        description: Get retention-based recommendations for a chat session
+    services:
+      - ChatService: create_chat, list_chats, get_chat, get_chat_shorts, submit_engagement, get_recommendations, refresh_chat_summary, sync_existing_chats
+
+  core:
+    description: Shared domain models, storage abstractions, and auth
+    models:
+      - BatchRecord, BatchItemRecord, GeneratedBundle, ScriptDraft, AssetRecord, WordTiming
+      - API request/response models (Pydantic)
+    storage:
+      - Repository (abstract): InMemoryRepository (tests), SupabaseRepository (prod)
+      - BlobStore (abstract): LocalBlobStore (tests), SupabaseBlobStore (prod)
+    auth:
+      - JWT Bearer token validation (Supabase JWTs)
+      - Guest mode (no token → general library scope)
+
+configuration:
+  class: Settings (pydantic-settings)
+  key_settings:
+    - producer_mode: direct_openai | elevenlabs_native
+    - narration_mode: elevenlabs_tts | elevenlabs_agent
+    - render_concurrency: int (parallel FFmpeg jobs)
+    - ffmpeg_bin / ffprobe_bin: path to binaries
+    - supabase_url / supabase_service_role_key: optional (local storage fallback)
+    - allowed_gameplay_games_csv: allowlist for gameplay asset games
+
+existing_tests:
+  - test_agents.py: 15 tests covering AgentService helpers, custom LLM normalization
+  - test_api.py: 10 tests covering batch/chat/asset API endpoints (in-memory storage)
+  - test_asset_selector.py: 3 tests covering AssetSelector tag scoring
+  - test_elevenlabs_alignment.py: 3 tests covering word timing extraction + audio normalization
+  - test_firecrawl_client.py: 2 tests covering scrape fallback + site map failure
+  - test_firecrawl_ranking.py: 2 tests covering URL ranking + extraction
+  - test_producer_crewai.py: 11 tests covering sectioning + CrewAI flow validation
+  - test_subtitles.py: 9 tests covering ASS subtitle generation + quota mapping
+
+coverage_gaps:
+  high_priority:
+    - FFmpegRenderer.render (subprocess success/failure, music vs no-music branch)
+    - escape_filter_path / build_subtitle_filter (special character escaping)
+    - AssetSelector.choose_music (untested)
+    - AssetSelector._choose RuntimeError when no assets of expected kind
+    - build_subtitle_track ValueError on empty word_timings
+    - chunk_word_timings / format_ass_time / escape_ass (pure helpers, no direct tests)
+    - BatchOrchestrator._subtitle_preset_by_id (invalid ID → RuntimeError)
+    - BatchOrchestrator._choose_subtitle_preset (quota exhaustion, non-repeat logic)
+    - BatchOrchestrator._rank_subtitle_presets / _tokenize_context / _stable_subtitle_seed
+    - BatchOrchestrator._finalize_batch (PARTIAL_FAILED / FAILED / COMPLETED branching)
+    - BatchOrchestrator._replace_narration_opening edge cases
+    - AgentService.run_producer (full orchestration logic)
+    - CrewAIProducerFlow.generate_bundle (full async flow)
+    - FirecrawlClient.ingest routing by SourceKind

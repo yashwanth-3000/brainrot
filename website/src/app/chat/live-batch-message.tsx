@@ -646,9 +646,6 @@ function shortId(value: string) {
 }
 
 function resolveBatchItemVideoUrl(batchId: string, item: BatchItemRecord) {
-  if (item.output_url && item.output_url.startsWith("http")) {
-    return item.output_url;
-  }
   return `/api/brainrot/batches/${batchId}/items/${item.id}/video`;
 }
 

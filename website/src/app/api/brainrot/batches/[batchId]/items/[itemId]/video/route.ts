@@ -1,14 +1,23 @@
-import { buildBrainrotBackendUrl, buildBrainrotProxyHeaders } from "@/lib/brainrot-backend";
+import { buildBrainrotBackendUrl, buildBrainrotProxyHeaders, buildVideoRelayResponse } from "@/lib/brainrot-backend";
 
 export const runtime = "nodejs";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ batchId: string; itemId: string }> },
 ) {
   const { batchId, itemId } = await context.params;
+  const headers = await buildBrainrotProxyHeaders();
+  const rangeHeader = request.headers.get("range");
+  const ifRangeHeader = request.headers.get("if-range");
+  if (rangeHeader) {
+    headers.set("Range", rangeHeader);
+  }
+  if (ifRangeHeader) {
+    headers.set("If-Range", ifRangeHeader);
+  }
   const upstream = await fetch(buildBrainrotBackendUrl(`/v1/batches/${batchId}/items/${itemId}/video`), {
-    headers: await buildBrainrotProxyHeaders(),
+    headers,
     cache: "no-store",
   });
 
@@ -22,11 +31,5 @@ export async function GET(
     });
   }
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: {
-      "Content-Type": upstream.headers.get("content-type") ?? "video/mp4",
-      "Cache-Control": "no-store",
-    },
-  });
+  return buildVideoRelayResponse(upstream, "video/mp4");
 }

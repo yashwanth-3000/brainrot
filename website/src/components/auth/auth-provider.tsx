@@ -29,6 +29,7 @@ type AuthContextValue = {
   avatarUrl: string | null;
   scopeKey: string;
   signInWithGoogle: (nextPath?: string) => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<string | null>;
   signOut: () => Promise<void>;
   skipLogin: () => void;
 };
@@ -126,16 +127,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [router, supabase]);
 
   const signInWithGoogle = useCallback(async (nextPath?: string) => {
+    const next = nextPath ?? (typeof window !== "undefined" ? `${window.location.pathname}${window.location.search}` : "/shorts");
+    const loginErrorPath = `/login?auth=error&next=${encodeURIComponent(next)}`;
     if (!SUPABASE_GOOGLE_AUTH_ENABLED) {
       startTransition(() => {
-        router.push("/shorts?auth=error");
+        router.push(loginErrorPath);
       });
       return;
     }
     if (typeof window === "undefined") {
       return;
     }
-    const next = nextPath ?? `${window.location.pathname}${window.location.search}`;
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -149,12 +151,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (error || !data?.url) {
       startTransition(() => {
-        router.push("/shorts?auth=error");
+        router.push(loginErrorPath);
       });
       return;
     }
     window.location.assign(data.url);
   }, [router, supabase]);
+
+  const signInWithPassword = useCallback(async (email: string, password: string) => {
+    const normalizedEmail = email.trim();
+    const normalizedPassword = password.trim();
+    if (!normalizedEmail || !normalizedPassword) {
+      return "Enter both your email and password."
+    }
+
+    const { error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password: normalizedPassword,
+    });
+
+    if (error) {
+      return error.message;
+    }
+
+    return null;
+  }, [supabase]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -190,10 +211,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       avatarUrl: extractAvatarUrl(user),
       scopeKey: user ? `user:${user.id}` : guestModeChosen ? "guest:chosen" : "guest",
       signInWithGoogle,
+      signInWithPassword,
       signOut,
       skipLogin,
     }),
-    [guestModeChosen, isLoading, signInWithGoogle, signOut, skipLogin, user],
+    [guestModeChosen, isLoading, signInWithGoogle, signInWithPassword, signOut, skipLogin, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

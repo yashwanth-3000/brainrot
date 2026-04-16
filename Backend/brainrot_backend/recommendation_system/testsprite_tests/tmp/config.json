@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "backend",
+  "localEndpoint": "http://localhost:8000/",
+  "serverPort": 51331,
+  "executionArgs": {
+    "projectName": "recommendation-system-test-1",
+    "projectPath": "/Users/yashwanthkrishna/Desktop/Drafter/Backend/brainrot_backend/recommendation_system",
+    "testIds": [],
+    "additionalInstruction": "CRITICAL API RESPONSE SHAPES — follow EXACTLY:\n\nPOST /v1/chats response is NESTED:\n  {\"chat\": {\"id\": \"uuid\", \"title\": \"...\", ...}}\n  chat_id = response.json()['chat']['id']\n  DO NOT USE response.json()['chat_id'] — THAT KEY DOES NOT EXIST\n\nGET /v1/chats: {\"items\": [{\"id\": \"...\", ...}, ...]}\nGET /v1/chats/{chat_id}: {\"chat\": {\"id\": \"...\", ...}}\nGET /v1/chats/{chat_id}/shorts: {\"chat_id\": \"...\", \"items\": [...]}\nPOST /v1/chats/{chat_id}/engagement body requires item_id, viewer_id, session_id (strings). Response: {\"engagement\": {\"id\": \"...\"}}\nGET /v1/chats/{chat_id}/recommendations: {\"chat_id\": \"...\", \"has_enough_data\": bool, \"reels_tracked\": int, ...}\n\nchat_id path params must be valid UUIDs. Non-UUID returns 422, non-existent returns 404.\nServer running at http://localhost:8000.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-v2EbfgfRfkDjY5Y44VOeEUccldtpbWPaZ-RVRy_VBKxgjtjblR3lYnufHr5UG0qM261BWKOS0kN9d9HRD9zcKWAAIUvR-ZAHndi0SyRlP9KRi8WSw_UYC8ViM0XZd9F2vOs"
+    }
+  },
+  "proxy": "http://de39a07d-3917-4b95-be31-8239e1d81c41:oWOMhRaNPppqglmMypVnCC7TtOGZ1dhK@tun.testsprite.com:8080"
+}

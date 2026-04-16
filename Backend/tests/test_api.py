@@ -1,4 +1,5 @@
 import pytest
+import httpx
 from fastapi.testclient import TestClient
 
 from brainrot_backend.auth import AuthenticationError, RequestAuthContext
@@ -160,6 +161,123 @@ def test_get_batch_item_video_falls_back_to_local_render_when_batch_record_is_mi
     assert response.status_code == 200
     assert response.headers["content-type"] == "video/mp4"
     assert response.content == b"fake-mp4"
+
+
+def test_get_batch_item_video_proxies_remote_output_url(tmp_path, monkeypatch):
+    settings = Settings(
+        data_dir=tmp_path / "data",
+        temp_dir=tmp_path / "tmp",
+        storage_backend="memory",
+        supabase_url=None,
+        supabase_service_role_key=None,
+        supabase_public_url=None,
+    )
+    app = create_app(settings)
+
+    captured_request_headers: dict[str, str | None] = {}
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            self._response = httpx.Response(
+                206,
+                headers={
+                    "content-type": "video/mp4",
+                    "content-length": "11",
+                    "content-range": "bytes 0-10/11",
+                    "accept-ranges": "bytes",
+                },
+                content=b"proxied-mp4",
+                request=httpx.Request("GET", "https://example.com/video.mp4"),
+            )
+
+        def build_request(self, method: str, url: str, headers: dict[str, str] | None = None):
+            return httpx.Request(method, url, headers=headers)
+
+        async def send(self, request, stream: bool = False):
+            self._response.request = request
+            captured_request_headers["range"] = request.headers.get("range")
+            return self._response
+
+        async def aclose(self):
+            return None
+
+    monkeypatch.setattr(
+        "brainrot_backend.video_generator.routes.video_proxy.httpx.AsyncClient",
+        FakeAsyncClient,
+    )
+
+    with TestClient(app) as client:
+        app.state.container.batch_service._schedule = lambda *args, **kwargs: None
+        repository = app.state.container.repository
+        import asyncio
+
+        asyncio.run(
+            repository.upsert_agent_config(
+                AgentConfigRecord(
+                    role=AgentRole.PRODUCER,
+                    name="Producer",
+                    agent_id="producer-agent",
+                )
+            )
+        )
+        asyncio.run(
+            repository.upsert_agent_config(
+                AgentConfigRecord(
+                    role=AgentRole.NARRATOR,
+                    name="Narrator",
+                    agent_id="narrator-agent",
+                )
+            )
+        )
+
+        chat_response = client.post("/v1/chats", json={"title": "Remote video chat"})
+        assert chat_response.status_code == 200
+        chat_id = chat_response.json()["chat"]["id"]
+
+        batch_response = client.post(
+            "/v1/batches",
+            data={
+                "chat_id": chat_id,
+                "source_url": "https://example.com/blog/test-post",
+                "count": "5",
+            },
+        )
+        assert batch_response.status_code == 200
+        payload = batch_response.json()
+        first_item_id = payload["items"][0]["id"]
+        batch_id = payload["batch"]["id"]
+
+        asyncio.run(
+            repository.update_batch_item(
+                first_item_id,
+                status=BatchItemStatus.UPLOADED,
+                output_url="https://example.com/video.mp4",
+                script=ScriptDraft(
+                    title="Remote video",
+                    hook="Remote video",
+                    narration_text="remote narration",
+                    caption_text="remote caption",
+                    estimated_seconds=26.0,
+                    visual_beats=[],
+                    music_tags=[],
+                    gameplay_tags=[],
+                    source_facts_used=[],
+                    qa_notes=[],
+                ),
+            )
+        )
+
+        response = client.get(
+            f"/v1/batches/{batch_id}/items/{first_item_id}/video",
+            headers={"Range": "bytes=0-10"},
+        )
+
+    assert response.status_code == 206
+    assert response.headers["accept-ranges"] == "bytes"
+    assert response.headers["content-type"] == "video/mp4"
+    assert response.headers["content-range"] == "bytes 0-10/11"
+    assert response.content == b"proxied-mp4"
+    assert captured_request_headers["range"] == "bytes=0-10"
 
 
 def test_forced_supabase_storage_requires_credentials():

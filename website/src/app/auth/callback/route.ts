@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   let next = searchParams.get("next") ?? "/shorts";
+  const errorRedirect = `${origin}/login?auth=error&next=${encodeURIComponent(next)}`;
 
   if (!next.startsWith("/")) {
     next = "/shorts";
@@ -19,5 +20,5 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.redirect(`${origin}/shorts?auth=error`);
+  return NextResponse.redirect(errorRedirect);
 }

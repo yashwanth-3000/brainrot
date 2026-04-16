@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 
 from brainrot_backend.auth import AuthConfigurationError, AuthenticationError
@@ -46,9 +48,10 @@ async def list_chats(
 @router.get("/{chat_id}", response_model=ChatEnvelope)
 async def get_chat(
     request: Request,
-    chat_id: str,
+    chat_id: UUID,
     authorization: str | None = Header(default=None),
 ) -> ChatEnvelope:
+    chat_id: str = str(chat_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -62,9 +65,10 @@ async def get_chat(
 @router.get("/{chat_id}/shorts", response_model=ChatGeneratedAssetsResponse)
 async def get_chat_generated_assets(
     request: Request,
-    chat_id: str,
+    chat_id: UUID,
     authorization: str | None = Header(default=None),
 ) -> ChatGeneratedAssetsResponse:
+    chat_id: str = str(chat_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -78,10 +82,11 @@ async def get_chat_generated_assets(
 @router.post("/{chat_id}/engagement", response_model=ShortEngagementEnvelope)
 async def record_chat_short_engagement(
     request: Request,
-    chat_id: str,
+    chat_id: UUID,
     payload: ShortEngagementRequest,
     authorization: str | None = Header(default=None),
 ) -> ShortEngagementEnvelope:
+    chat_id: str = str(chat_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -95,10 +100,11 @@ async def record_chat_short_engagement(
 @router.get("/{chat_id}/recommendations", response_model=ChatRecommendationResponse)
 async def get_chat_recommendations(
     request: Request,
-    chat_id: str,
+    chat_id: UUID,
     session_id: str | None = Query(default=None),
     authorization: str | None = Header(default=None),
 ) -> ChatRecommendationResponse:
+    chat_id: str = str(chat_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:

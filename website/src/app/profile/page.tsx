@@ -143,10 +143,10 @@ export default function ProfilePage() {
               </>
             ) : (
               <>
-                <button type="button" className={styles.primaryAction} onClick={() => void auth.signInWithGoogle("/profile")}>
-                  Sign in with Google
+                <Link href="/login?next=%2Fprofile" className={styles.primaryAction}>
+                  Login
                   <ArrowRight size={14} />
-                </button>
+                </Link>
                 <Link href="/shorts" className={styles.secondaryAction}>
                   Browse general library
                 </Link>

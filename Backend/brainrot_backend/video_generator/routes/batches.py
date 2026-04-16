@@ -2,29 +2,22 @@ from __future__ import annotations
 
 from pathlib import Path
 from urllib.parse import urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from sse_starlette.sse import EventSourceResponse
 
 from brainrot_backend.auth import AuthConfigurationError, AuthenticationError
 from brainrot_backend.core.models.api import BatchEnvelope, BatchRetryResponse
 from brainrot_backend.core.models.enums import SourceKind
+from brainrot_backend.video_generator.routes.video_proxy import video_response_from_output_url
 
 router = APIRouter(prefix="/batches", tags=["batches"])
 
 
 def _local_render_path(settings, batch_id: str, item_id: str) -> Path:
     return settings.data_dir / settings.final_render_bucket / batch_id / f"{item_id}.mp4"
-
-
-def _video_response_from_output_url(output_url: str):
-    if output_url.startswith("file://"):
-        local_path = Path(urlparse(output_url).path)
-        if not local_path.exists():
-            raise HTTPException(status_code=404, detail="Video file is missing.")
-        return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
-    return RedirectResponse(output_url)
 
 
 @router.post("", response_model=BatchEnvelope)
@@ -73,9 +66,10 @@ async def create_batch(
 @router.get("/{batch_id}", response_model=BatchEnvelope)
 async def get_batch(
     request: Request,
-    batch_id: str,
+    batch_id: UUID,
     authorization: str | None = Header(default=None),
 ) -> BatchEnvelope:
+    batch_id: str = str(batch_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -89,10 +83,11 @@ async def get_batch(
 @router.get("/{batch_id}/items/{item_id}/video")
 async def get_batch_item_video(
     request: Request,
-    batch_id: str,
-    item_id: str,
+    batch_id: UUID,
+    item_id: UUID,
     authorization: str | None = Header(default=None),
 ):
+    batch_id, item_id = str(batch_id), str(item_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -105,7 +100,11 @@ async def get_batch_item_video(
     if envelope is not None:
         item = next((candidate for candidate in envelope.items if candidate.id == item_id), None)
         if item is not None and item.output_url:
-            return _video_response_from_output_url(item.output_url)
+            return await video_response_from_output_url(
+                item.output_url,
+                range_header=request.headers.get("range"),
+                if_range_header=request.headers.get("if-range"),
+            )
         if item is not None:
             fallback_path = _local_render_path(container.settings, batch_id, item_id)
             if fallback_path.exists():
@@ -122,10 +121,11 @@ async def get_batch_item_video(
 @router.get("/{batch_id}/events")
 async def stream_events(
     request: Request,
-    batch_id: str,
+    batch_id: UUID,
     last_event_id: str | None = None,
     authorization: str | None = Header(default=None),
 ):
+    batch_id: str = str(batch_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:
@@ -142,9 +142,10 @@ async def stream_events(
 @router.post("/{batch_id}/retry", response_model=BatchRetryResponse)
 async def retry_failed_items(
     request: Request,
-    batch_id: str,
+    batch_id: UUID,
     authorization: str | None = Header(default=None),
 ) -> BatchRetryResponse:
+    batch_id: str = str(batch_id)
     container = request.app.state.container
     auth = await _resolve_auth_context(request, authorization=authorization)
     try:

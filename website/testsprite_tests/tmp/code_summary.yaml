@@ -1,0 +1,176 @@
+version: "2"
+type: frontend
+tech_stack:
+  - language: TypeScript
+  - framework: Next.js 15 (App Router)
+  - ui_library: CSS Modules, Lucide React, Framer Motion
+  - other: Supabase Auth, Google OAuth
+routes:
+  - path: /
+    file: src/app/page.tsx
+    auth_required: false
+    description: Marketing home page with hero, features, and how-it-works sections
+  - path: /login
+    file: src/app/login/page.tsx
+    auth_required: false
+    description: Login page with Google OAuth sign-in and guest continue options
+  - path: /auth/callback
+    file: src/app/auth/callback/route.ts
+    auth_required: false
+    description: Supabase OAuth callback route that exchanges code for session
+  - path: /chat
+    file: src/app/chat/page.tsx
+    auth_required: false
+    description: AI chat page for generating brainrot short videos from URLs or PDFs
+  - path: /shorts
+    file: src/app/shorts/page.tsx
+    auth_required: false
+    description: Shorts library viewer with TikTok-style feed, chat list sidebar, and recommendation insights
+  - path: /profile
+    file: src/app/profile/page.tsx
+    auth_required: false
+    description: User profile page showing account info, stats, and recent chats; guest users see upsell
+  - path: /about
+    file: src/app/about/page.tsx
+    auth_required: false
+    description: About page with video hero explaining the product
+  - path: /video-edit
+    file: src/app/video-edit/page.tsx
+    auth_required: false
+    description: Video editing lab page
+  - path: /test
+    file: src/app/test/page.tsx
+    auth_required: false
+    description: Internal test lab page
+features:
+  - name: Google OAuth Login
+    description: Sign in with Google via Supabase OAuth. Redirects through /auth/callback to exchange code for session.
+    files:
+      - src/app/login/page.tsx
+      - src/app/auth/callback/route.ts
+      - src/components/auth/auth-provider.tsx
+    entry_route: /login
+    user_interactions:
+      - See the login card with "Sign in when you want your own library" headline
+      - Click "Login with Google" button to initiate Google OAuth
+      - See error message if Google sign-in fails
+      - Click "Continue as guest" to skip login and proceed as guest
+    api_calls:
+      - method: GET
+        endpoint: /auth/callback?code=...&next=...
+    auth_required: false
+  - name: Guest Mode
+    description: Users can skip login and use the app as a guest, accessing the shared general library.
+    files:
+      - src/app/login/page.tsx
+      - src/components/auth/auth-provider.tsx
+    entry_route: /login
+    user_interactions:
+      - Click "Continue as guest" on the login page
+      - Use the app without signing in
+      - See "General library" label in the UI
+    api_calls: []
+    auth_required: false
+  - name: Sign Out
+    description: Authenticated users can sign out from the profile page.
+    files:
+      - src/app/profile/page.tsx
+      - src/components/auth/auth-provider.tsx
+    entry_route: /profile
+    user_interactions:
+      - Click "Log out" button on the profile page
+      - Session is cleared and user is returned to guest mode
+    api_calls: []
+    auth_required: true
+  - name: AI Chat Video Generation
+    description: Users paste a URL or upload a PDF and the backend generates brainrot short videos via CrewAI + OpenAI pipeline.
+    files:
+      - src/app/chat/page.tsx
+      - src/app/api/brainrot/batches/route.ts
+      - src/app/api/brainrot/chats/route.ts
+      - src/app/api/brainrot/agents/bootstrap/route.ts
+    entry_route: /chat
+    user_interactions:
+      - See the hero heading "Turn your content into brainrot."
+      - Type or paste a URL into the prompt input box
+      - Upload a PDF file
+      - Adjust the video count (5–15) using the stepper
+      - Click the send/submit button to start generation
+      - Watch live batch status stream in the conversation
+      - See error message if generation fails
+    api_calls:
+      - method: POST
+        endpoint: /api/brainrot/chats
+      - method: POST
+        endpoint: /api/brainrot/agents/bootstrap
+      - method: POST
+        endpoint: /api/brainrot/batches
+      - method: GET
+        endpoint: /api/brainrot/batches/{batchId}/events
+    auth_required: false
+  - name: Shorts Library Viewer
+    description: TikTok-style vertical video feed showing generated shorts. Users can browse chats in a sidebar and watch their shorts.
+    files:
+      - src/app/shorts/page.tsx
+    entry_route: /shorts
+    user_interactions:
+      - See the sidebar with list of chat sessions
+      - Click a chat to load its shorts
+      - Scroll/swipe to navigate between shorts in the feed
+      - Click the video to play/pause
+      - Click the mute button to toggle audio
+      - Click the like button to like a short
+      - Click the info button to see metadata panel
+      - Click the open button to open the video in a new tab
+    api_calls:
+      - method: GET
+        endpoint: /api/brainrot/chats
+      - method: GET
+        endpoint: /api/brainrot/chats/{chatId}
+      - method: GET
+        endpoint: /api/brainrot/chats/{chatId}/shorts
+      - method: GET
+        endpoint: /api/brainrot/chats/{chatId}/recommendations
+      - method: POST
+        endpoint: /api/brainrot/chats/{chatId}/engagement
+    auth_required: false
+  - name: User Profile
+    description: Profile page showing user identity, account stats, recent chats, and sign-out button for authenticated users. Shows upsell for guests.
+    files:
+      - src/app/profile/page.tsx
+    entry_route: /profile
+    user_interactions:
+      - See display name and avatar
+      - See stats (saved shorts, generation runs, active chats, failed runs)
+      - See recent chat activity list
+      - Click "Open your library" to go to shorts
+      - Click "Log out" to sign out
+      - Guest sees upsell message and "Login" button
+    api_calls:
+      - method: GET
+        endpoint: /api/brainrot/chats
+    auth_required: false
+  - name: Navbar Navigation
+    description: Persistent top navigation bar with links to all major sections and auth state display.
+    files:
+      - src/components/ui/navbar.tsx
+    entry_route: /
+    user_interactions:
+      - Click "Draftr" logo to go to home
+      - Click "Chat" link to go to chat
+      - Click "Shorts" link to go to shorts library
+      - Click "About" link to go to about page
+      - Click user avatar/name to go to profile
+      - See login button if not authenticated
+    api_calls: []
+    auth_required: false
+known_limitations:
+  - issue: Google OAuth requires NEXT_PUBLIC_SUPABASE_GOOGLE_AUTH_ENABLED=true; if not set, sign-in redirects to an error page
+    location: src/components/auth/auth-provider.tsx
+    impact: Login with Google will fail unless environment variable is configured correctly
+  - issue: Video generation requires a running backend (FastAPI/brainrot) service; if backend is down, batch creation fails
+    location: src/app/api/brainrot/batches/route.ts
+    impact: Chat generation will show an error if the backend is not reachable
+  - issue: Engagement tracking is best-effort; failures are silently swallowed
+    location: src/app/shorts/page.tsx
+    impact: Watch-time and retention data may be incomplete

@@ -6,7 +6,7 @@ import HomeHeroVideo from './home-hero-video'
 const stats = [
   { value: '3 min', label: 'avg. video generated' },
   { value: '10×', label: 'faster than reading' },
-  { value: '94%', label: 'retention vs passive scroll' },
+  { value: '2 modes', label: 'guest or personal library' },
 ]
 
 const features = [
@@ -36,18 +36,18 @@ const features = [
 const steps = [
   {
     n: '01',
-    title: 'Drop your content',
-    body: 'Paste a URL, upload a PDF, or dump raw text. Your study notes, a blog you bookmarked, or a paper you\'ve been avoiding all work.',
+    title: 'Start as guest or sign in',
+    body: 'Use guest mode if you want to try it fast, or sign in with Google so every generation lands in your own private library instead of the shared one.',
   },
   {
     n: '02',
-    title: 'AI extracts what matters',
-    body: 'Draftr reads everything, strips the fluff, and structures the key ideas into a tight, punchy script made for short-form attention spans.',
+    title: 'CrewAI plans the coverage',
+    body: 'Draftr ingests the source, splits it into sections, and lets CrewAI plan which parts deserve their own short before OpenAI writes each slot.',
   },
   {
     n: '03',
-    title: 'Brainrot video, generated',
-    body: 'A video drops with a gameplay background, your content layered on top, and narration in the same dopamine-triggering format you\'ve been watching for hours anyway.',
+    title: 'Your library fills itself',
+    body: 'Narration, subtitles, gameplay, and rendering all run automatically. Guests feed the general library, while signed-in users build a personal archive of every short.',
   },
 ]
 
@@ -84,7 +84,8 @@ export default function HomePage() {
             You&apos;re already watching hours of gameplay clips with text over them.
             What if that content was <strong>your study notes? Your bookmarked articles?
             That paper you keep putting off?</strong> Draftr converts any content into short-form brainrot videos
-            your brain actually learns from.
+            your brain actually learns from. Try it instantly in guest mode, then sign in with Google when you want
+            your own library and saved generation history.
           </p>
 
           <div className="hp-actions">

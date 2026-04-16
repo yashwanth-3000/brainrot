@@ -1,0 +1,77 @@
+[
+  {
+    "id": "TC001",
+    "title": "get_health_endpoint",
+    "description": "GET /health (not /v1/health). Response: {\"status\": \"ok\"}. Verify status 200 and response.json()['status'] == 'ok'."
+  },
+  {
+    "id": "TC002",
+    "title": "post_v1_batches_create_batch",
+    "description": "POST /v1/batches uses multipart/form-data (NOT JSON). Required form fields: 'source_url' (string) and 'count' (int, 5-15). Use requests.post(url, data={'source_url': 'https://example.com', 'count': '5'}). Response: {'batch': {'id': 'uuid', 'status': 'queued', ...}, 'items': [...]}. Verify status 200, batch id is a UUID string at response.json()['batch']['id'], items is a list."
+  },
+  {
+    "id": "TC003",
+    "title": "post_v1_batches_validation_errors",
+    "description": "POST /v1/batches with invalid form-data. Test: (1) data={} → 422, (2) data={'source_url':'http://x.com','count':'4'} → 422 (count <5), (3) data={'source_url':'http://x.com','count':'16'} → 422 (count >15), (4) data={'count':'5'} no source_url or file → 422. All use requests.post(url, data=...) NOT JSON."
+  },
+  {
+    "id": "TC004",
+    "title": "get_v1_batches_uuid_validation_and_404",
+    "description": "GET /v1/batches/not-a-uuid → 422 (invalid UUID). GET /v1/batches/00000000-0000-0000-0000-000000000000 → 404 (valid UUID, not found). Verify both."
+  },
+  {
+    "id": "TC005",
+    "title": "get_v1_batches_sse_events",
+    "description": "First create batch: POST /v1/batches with data={'source_url':'https://example.com','count':'5'}, get batch_id from response.json()['batch']['id']. Then GET /v1/batches/{batch_id}/events with headers={'Accept':'text/event-stream'} and stream=True. DO NOT import sseclient. Parse manually with response.iter_lines(). Verify status 200 and content-type contains 'text/event-stream'. Read events for up to 10 seconds then close."
+  },
+  {
+    "id": "TC006",
+    "title": "post_v1_assets_upload",
+    "description": "POST /v1/assets/upload (path is /v1/assets/upload NOT /v1/assets). Multipart: files={'file':('test.mp4', b'fake-video-content', 'video/mp4')}, data={'kind':'gameplay','tags':'test','metadata_json':'{}'}. Required: 'file' and 'kind' (enum: gameplay|music|font). Response: {'asset': {'id': 'uuid', 'kind': 'gameplay', ...}}. Verify status 200 and asset id exists."
+  },
+  {
+    "id": "TC007",
+    "title": "post_v1_assets_upload_validation",
+    "description": "POST /v1/assets/upload missing required fields. (1) File but no kind → 422. (2) Kind but no file → 422. (3) Invalid kind value → 422. Use correct path /v1/assets/upload."
+  },
+  {
+    "id": "TC008",
+    "title": "post_v1_agents_bootstrap",
+    "description": "POST /v1/agents/bootstrap with no body. Response: {'agents': [...], 'tool_ids': [...]}. Verify status 200, both are lists, each agent has 'id','role','name','agent_id'."
+  },
+  {
+    "id": "TC009",
+    "title": "post_v1_agents_webhooks_elevenlabs_signature",
+    "description": "POST /v1/agents/webhooks/elevenlabs (plural 'webhooks' NOT 'webhook'). (1) No signature header → 400 with detail 'Missing ElevenLabs webhook signature header.' (2) Fake signature header 'elevenlabs-signature: fake' with JSON body → 400."
+  },
+  {
+    "id": "TC010",
+    "title": "post_v1_chats_create_chat",
+    "description": "POST /v1/chats with JSON body {\"title\":\"Full Backend Test Chat\"}. CRITICAL: The response is a NESTED envelope. The JSON shape is: {\"chat\": {\"id\": \"uuid-string\", \"title\": \"...\", \"library_scope\": \"general\", ...}}. You MUST extract the chat ID like this: chat_id = response.json()['chat']['id']. The key 'chat_id' DOES NOT exist at the top level — do NOT use response.json()['chat_id']. Verify status 200, chat_id is a non-empty string."
+  },
+  {
+    "id": "TC011",
+    "title": "get_v1_chats_list_and_get_single",
+    "description": "Step 1: Create chat via POST /v1/chats with JSON {\"title\":\"List Test\"}. Get chat_id from response.json()['chat']['id'] (NESTED — NOT response.json()['chat_id']). Step 2: GET /v1/chats — response is {\"items\": [{\"id\":\"...\", ...}]}. Verify chat appears in items by matching item['id'] == chat_id. Step 3: GET /v1/chats/{chat_id} — response is {\"chat\":{\"id\":\"...\", ...}}. Verify match."
+  },
+  {
+    "id": "TC012",
+    "title": "get_v1_chats_chatid_errors",
+    "description": "GET /v1/chats/invalid-uuid → 422. GET /v1/chats/00000000-0000-0000-0000-000000000000 → 404. Verify both."
+  },
+  {
+    "id": "TC013",
+    "title": "post_v1_chats_engagement_and_recommendations",
+    "description": "Step 1: Create chat via POST /v1/chats with JSON {\"title\":\"E2E Test\"}. Get chat_id from response.json()['chat']['id'] (NESTED — NOT json['chat_id']). Step 2: POST /v1/chats/{chat_id}/engagement with JSON {\"item_id\":\"11111111-1111-1111-1111-111111111111\",\"viewer_id\":\"22222222-2222-2222-2222-222222222222\",\"session_id\":\"33333333-3333-3333-3333-333333333333\",\"watch_time_seconds\":30.0,\"completion_ratio\":0.8,\"liked\":true}. Response: {\"engagement\":{\"id\":\"...\", ...}}. Verify status 200. Step 3: GET /v1/chats/{chat_id}/recommendations. Response includes 'has_enough_data' boolean field. Verify status 200."
+  },
+  {
+    "id": "TC014",
+    "title": "post_v1_chats_engagement_errors",
+    "description": "Test engagement error paths. (1) POST /v1/chats/00000000-0000-0000-0000-000000000000/engagement with JSON {\"item_id\":\"a\",\"viewer_id\":\"b\",\"session_id\":\"c\"} → 404. (2) Create a chat (chat_id from response.json()['chat']['id']), then POST engagement missing 'item_id': {\"viewer_id\":\"x\",\"session_id\":\"y\"} → 422."
+  },
+  {
+    "id": "TC015",
+    "title": "get_v1_video_edit_options",
+    "description": "GET /v1/video-edit/options. Response: {'gameplay_assets': [...], 'subtitle_presets': [...]}. Verify status 200, both are lists."
+  }
+]

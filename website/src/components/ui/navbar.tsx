@@ -25,6 +25,8 @@ export default function Navbar({ collapsed = false, collapsedAlign = "center" }:
   const auth = useAuth();
   const collapsedRight = collapsedAlign === "right";
   const compactDisplayName = auth.displayName.trim().split(/\s+/)[0] ?? auth.displayName;
+  const loginHref = pathname === "/login" ? "/login" : `/login?next=${encodeURIComponent(pathname)}`;
+  const showLoginAction = !auth.isAuthenticated && pathname !== "/login";
 
   const navStyle: React.CSSProperties = {
     background:
@@ -54,12 +56,12 @@ export default function Navbar({ collapsed = false, collapsedAlign = "center" }:
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 6,
     borderRadius: 999,
-    padding: "7px 12px",
-    fontSize: 10,
+    padding: "5px 11px",
+    fontSize: 9,
     fontWeight: 700,
-    letterSpacing: "0.14em",
+    letterSpacing: "0.12em",
     textTransform: "uppercase",
     textDecoration: "none",
     border: primary ? "1px solid rgba(109,91,255,0.32)" : "1px solid rgba(255,255,255,0.12)",
@@ -267,40 +269,19 @@ export default function Navbar({ collapsed = false, collapsedAlign = "center" }:
                     </div>
                   </div>
                 </Link>
-              ) : (
-                <div
+              ) : showLoginAction ? (
+                <Link
+                  href={loginHref}
+                  onClick={() => setMenuOpen(false)}
                   style={{
+                    ...authButtonStyle(true),
                     marginTop: 4,
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
                     padding: "8px 12px",
-                    borderRadius: 12,
-                    background: "rgba(255,255,255,0.04)",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      void auth.signInWithGoogle();
-                    }}
-                    style={authButtonStyle(true)}
-                  >
-                    Google login
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      auth.skipLogin();
-                    }}
-                    style={authButtonStyle(false)}
-                  >
-                    Skip for now
-                  </button>
-                </div>
-              )}
+                  Login
+                </Link>
+              ) : null}
 
               <a
                 href="https://github.com/yashwanth-3000/draftr"
@@ -392,20 +373,15 @@ export default function Navbar({ collapsed = false, collapsedAlign = "center" }:
         <span style={{ margin: "0 3px", height: 9, width: 1, background: "rgba(255,255,255,0.12)", display: "inline-block" }} />
 
         {auth.isAuthenticated ? (
-          <Link href="/profile" style={profileLinkStyle} aria-label="Open profile">
+          <Link href="/profile" style={profileLinkStyle} aria-label="Profile" title="Profile">
             <span style={profileNameStyle}>{compactDisplayName}</span>
             <UserAvatar name={auth.displayName} avatarUrl={auth.avatarUrl} size={22} />
           </Link>
-        ) : (
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-            <button type="button" onClick={() => void auth.signInWithGoogle()} style={authButtonStyle(true)}>
-              Google
-            </button>
-            <button type="button" onClick={auth.skipLogin} style={authButtonStyle(false)}>
-              Skip
-            </button>
-          </div>
-        )}
+        ) : showLoginAction ? (
+          <Link href={loginHref} style={authButtonStyle(true)}>
+            Login
+          </Link>
+        ) : null}
       </nav>
     </header>
   );

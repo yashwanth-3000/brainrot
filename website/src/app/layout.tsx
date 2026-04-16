@@ -18,7 +18,7 @@ const instrumentSerif = Instrument_Serif({
 
 export const metadata: Metadata = {
   title: 'Draftr',
-  description: 'SaaS landing page for a collaborative design workflow platform.',
+  description: 'Draftr turns URLs, PDFs, and notes into narrated short-form videos with guest access, Google login, and a personal library.',
   icons: {
     icon: '/favicon.svg',
   },

@@ -1,0 +1,702 @@
+[
+  {
+    "id": "TC001",
+    "title": "Navigate between key pages using the navbar",
+    "description": "Users can use the navbar to reach Chat, Shorts, About, and Profile pages without losing navigation state.",
+    "category": "Navbar Navigation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Use the navbar to go to the chat page"
+      },
+      {
+        "type": "action",
+        "description": "Use the navbar to go to the shorts page"
+      },
+      {
+        "type": "action",
+        "description": "Use the navbar to go to the about page"
+      },
+      {
+        "type": "action",
+        "description": "Use the navbar to open the profile page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the profile page"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC002",
+    "title": "Browse shorts by selecting a chat session",
+    "description": "Users can select a chat session from the shorts sidebar and the corresponding vertical feed loads and displays a short.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session in the sidebar"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the vertical feed displays shorts for the selected chat"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC003",
+    "title": "Start generation journey from the home page CTA",
+    "description": "Verifies a guest can move from the marketing home page into the chat generation page via the primary CTA and land on the chat experience.",
+    "category": "Home Page — Marketing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click the primary call-to-action to start generating a video"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the chat generation page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the chat generation inputs are available"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC004",
+    "title": "Directly open Shorts unauthenticated and browse General library",
+    "description": "Verifies an unauthenticated visitor can open Shorts directly and browse the General library feed.",
+    "category": "Guest Mode",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Select a chat from the sidebar"
+      },
+      {
+        "type": "action",
+        "description": "Scroll the vertical feed to the next short"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the shorts sidebar indicates the General library is active"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the feed updates to show a different short"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC005",
+    "title": "Navigate between shorts in the vertical feed",
+    "description": "Users can move through multiple shorts in a chat using scroll or swipe and the feed advances one short at a time.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session that has multiple shorts"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to move to the next short in the feed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a different short is displayed in the feed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC006",
+    "title": "Control playback and audio while watching shorts",
+    "description": "Users can toggle play/pause and mute/unmute on a short and the controls reflect the updated state.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session in the sidebar"
+      },
+      {
+        "type": "action",
+        "description": "Click the video to toggle play/pause"
+      },
+      {
+        "type": "action",
+        "description": "Click the mute control to toggle audio"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify playback and mute controls reflect the toggled states"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC007",
+    "title": "Navigate to core pages using the navbar from the home page",
+    "description": "Verifies the main navigation from the home page can reach core routes and the app remains navigable across pages.",
+    "category": "Home Page — Marketing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to the chat page"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to the shorts page"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to the about page"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to the profile page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the profile page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the page renders without a broken or blank state"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC008",
+    "title": "Navbar reflects guest auth state on home and profile",
+    "description": "Unauthenticated users see guest login affordances in the navbar and the profile page shows an upsell instead of account info.",
+    "category": "Navbar Navigation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Verify login affordances are visible in the navbar"
+      },
+      {
+        "type": "action",
+        "description": "Use the navbar to open the profile page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile page shows a guest upsell and a way to navigate to login"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC009",
+    "title": "Open a short in a new tab from the feed",
+    "description": "Users can choose to open the current short in a new tab and the new tab shows a standalone video view.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session in the sidebar"
+      },
+      {
+        "type": "action",
+        "description": "Choose to open the current short in a new tab"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a new tab opens with a standalone short view"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC010",
+    "title": "Generate shorts from a URL and see batch status stream",
+    "description": "Verifies a user can submit a URL with a valid video count and see live generation status appear in the chat conversation.",
+    "category": "AI Chat Video Generation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /chat"
+      },
+      {
+        "type": "action",
+        "description": "Fill a valid URL into the prompt input"
+      },
+      {
+        "type": "action",
+        "description": "Set the desired video count to a valid value within the allowed range"
+      },
+      {
+        "type": "action",
+        "description": "Submit the prompt to start generation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a live generation status stream appears in the conversation"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the conversation shows an in-progress generation state"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC011",
+    "title": "Browse General library from login as guest",
+    "description": "Verifies a visitor can continue as guest from the login page and browse the shared General library on Shorts.",
+    "category": "Guest Mode",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Choose to continue as guest"
+      },
+      {
+        "type": "action",
+        "description": "Click to navigate to the shorts library"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the shorts sidebar indicates the General library is active"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a vertical shorts feed is displayed"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC012",
+    "title": "Access login from the home page",
+    "description": "Verifies a guest can reach the login page from the home page and see authentication entry options.",
+    "category": "Home Page — Marketing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Click the navigation link to the login page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the login page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify guest entry and Google sign-in options are visible"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC013",
+    "title": "View short metadata in the info panel",
+    "description": "Users can open a metadata panel for a short and see details like title, source, duration, and style.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session in the sidebar"
+      },
+      {
+        "type": "action",
+        "description": "Open the metadata panel for the currently displayed short"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the metadata panel shows details for the short"
+      }
+    ],
+    "priority": "High"
+  },
+  {
+    "id": "TC014",
+    "title": "Log out returns the app to guest state",
+    "description": "Verifies an authenticated user can log out from the profile page and the UI returns to guest state.",
+    "category": "Sign Out",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with test-auth-20260413@example.com"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with DraftrTest!2026"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click to navigate to the profile page"
+      },
+      {
+        "type": "action",
+        "description": "Choose to log out"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile page shows a guest upsell experience"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a login navigation option is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC015",
+    "title": "Authenticated profile shows identity, stats, recent chats, and opens library",
+    "description": "Authenticated users see their profile identity and stats, can view recent chats, and can navigate to their shorts library from profile.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with test-auth-20260413@example.com"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with DraftrTest!2026"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /profile"
+      },
+      {
+        "type": "action",
+        "description": "Click the control to open your library"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the shorts library page is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC016",
+    "title": "Discover product explanation from home page to about page",
+    "description": "Verifies a guest can navigate from the home page to the about page using the educational CTA and view the product explanation content.",
+    "category": "Home Page — Marketing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Scroll to the section that explains how the product works"
+      },
+      {
+        "type": "action",
+        "description": "Click the call-to-action to learn how it works"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the about page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the about page explainer content is displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC017",
+    "title": "Like a short and see liked state update",
+    "description": "Users can like a short and the UI updates to show the short is liked.",
+    "category": "Shorts Library Viewer",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /shorts"
+      },
+      {
+        "type": "action",
+        "description": "Wait for the chat sessions list in the sidebar to load"
+      },
+      {
+        "type": "action",
+        "description": "Click a chat session in the sidebar"
+      },
+      {
+        "type": "action",
+        "description": "Click the like control on the currently displayed short"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the short displays a liked state"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC018",
+    "title": "Unauthenticated profile shows guest upsell and login option",
+    "description": "Verifies that when no session exists, the profile page shows an upsell experience with a path to login.",
+    "category": "Guest Mode",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /profile"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile page shows a guest upsell experience"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a login navigation option is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC019",
+    "title": "Guest profile shows upsell and routes to login",
+    "description": "Guest users can open the login page from the profile upsell prompt.",
+    "category": "User Profile",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /profile"
+      },
+      {
+        "type": "action",
+        "description": "Click the login navigation from the guest upsell"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the user lands on the login page"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC020",
+    "title": "After logout, navigating to profile remains in guest view",
+    "description": "Verifies that after logging out, revisiting the profile page still shows the guest upsell state.",
+    "category": "Sign Out",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /login"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the email field with test-auth-20260413@example.com"
+      },
+      {
+        "type": "action",
+        "description": "Fill in the password field with DraftrTest!2026"
+      },
+      {
+        "type": "action",
+        "description": "Submit the login form"
+      },
+      {
+        "type": "action",
+        "description": "Click to navigate to the profile page"
+      },
+      {
+        "type": "action",
+        "description": "Choose to log out"
+      },
+      {
+        "type": "action",
+        "description": "Navigate to /profile"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the profile page shows a guest upsell experience"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify a login navigation option is visible"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC021",
+    "title": "Home page value proposition sections are visible",
+    "description": "Verifies the home page presents the product value sections so a guest can understand what the app does.",
+    "category": "Home Page — Marketing",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /"
+      },
+      {
+        "type": "action",
+        "description": "Scroll through the marketing sections on the page"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the product description content is displayed"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify feature highlights are displayed"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC022",
+    "title": "Empty prompt submit is prevented",
+    "description": "Verifies the user cannot start generation when the prompt input is empty.",
+    "category": "AI Chat Video Generation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /chat"
+      },
+      {
+        "type": "action",
+        "description": "Ensure the prompt input is empty"
+      },
+      {
+        "type": "action",
+        "description": "Attempt to submit the prompt"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify generation does not start"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the conversation does not show an in-progress generation state"
+      }
+    ],
+    "priority": "Medium"
+  },
+  {
+    "id": "TC023",
+    "title": "Video count stepper enforces lower bound",
+    "description": "Verifies the video count cannot be decreased below the minimum allowed value.",
+    "category": "AI Chat Video Generation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /chat"
+      },
+      {
+        "type": "action",
+        "description": "Decrease the video count repeatedly until it stops changing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the displayed video count is not below the allowed minimum"
+      }
+    ],
+    "priority": "Low"
+  },
+  {
+    "id": "TC024",
+    "title": "Video count stepper enforces upper bound",
+    "description": "Verifies the video count cannot be increased above the maximum allowed value.",
+    "category": "AI Chat Video Generation",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Navigate to /chat"
+      },
+      {
+        "type": "action",
+        "description": "Increase the video count repeatedly until it stops changing"
+      },
+      {
+        "type": "assertion",
+        "description": "Verify the displayed video count is not above the allowed maximum"
+      }
+    ],
+    "priority": "Low"
+  }
+]

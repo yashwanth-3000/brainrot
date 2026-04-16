@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from urllib.parse import urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 
 from brainrot_backend.core.models.api import (
     SubtitlePresetOption,
@@ -13,6 +13,7 @@ from brainrot_backend.core.models.api import (
     VideoEditPreviewResponse,
 )
 from brainrot_backend.core.models.enums import AssetKind
+from brainrot_backend.video_generator.routes.video_proxy import video_response_from_output_url
 from brainrot_backend.video_generator.render.subtitles import subtitle_presets
 from brainrot_backend.video_generator.services.assets import filter_allowed_gameplay_assets
 
@@ -64,7 +65,8 @@ async def create_video_edit_preview(
 
 
 @router.get("/previews/{batch_id}/video")
-async def get_video_edit_preview_video(request: Request, batch_id: str):
+async def get_video_edit_preview_video(request: Request, batch_id: UUID):
+    batch_id: str = str(batch_id)
     container = request.app.state.container
     try:
         envelope = await container.batch_service.get_batch(batch_id)
@@ -84,13 +86,11 @@ async def get_video_edit_preview_video(request: Request, batch_id: str):
                 return FileResponse(fallback_path, media_type="video/mp4", filename=fallback_path.name)
             raise HTTPException(status_code=404, detail="Preview video is not ready yet.")
 
-        if item.output_url.startswith("file://"):
-            local_path = Path(urlparse(item.output_url).path)
-            if not local_path.exists():
-                raise HTTPException(status_code=404, detail="Preview file is missing.")
-            return FileResponse(local_path, media_type="video/mp4", filename=local_path.name)
-
-        return RedirectResponse(item.output_url)
+        return await video_response_from_output_url(
+            item.output_url,
+            range_header=request.headers.get("range"),
+            if_range_header=request.headers.get("if-range"),
+        )
 
     preview_dir = _local_preview_dir(container.settings, batch_id)
     fallback_candidates = sorted(preview_dir.glob("*.mp4"))

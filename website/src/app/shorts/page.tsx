@@ -144,6 +144,17 @@ const SHORTS_VIEWER_ID_STORAGE_KEY = 'draftr:viewer-id'
 const INSIGHTS_OPEN_STORAGE_KEY = 'draftr:shorts-insights-open'
 const INSIGHTS_WIDTH_STORAGE_KEY = 'draftr:shorts-insights-width'
 
+function buildBatchItemVideoProxyUrl(batchId: string, itemId: string) {
+  return `/api/brainrot/batches/${batchId}/items/${itemId}/video`
+}
+
+function resolveChatCoverVideoUrl(chat: ChatSummary | null) {
+  if (!chat?.cover_batch_id || !chat.cover_item_id) {
+    return null
+  }
+  return buildBatchItemVideoProxyUrl(chat.cover_batch_id, chat.cover_item_id)
+}
+
 // ─── Page root ───────────────────────────────────────────────────────────────
 
 export default function ShortsPage() {
@@ -196,7 +207,7 @@ function ShortsPageContent() {
     const origins = Array.from(
       new Set(
         [
-          selectedChat?.cover_output_url ?? null,
+          resolveChatCoverVideoUrl(selectedChat),
           ...shorts.slice(0, 2).map(short => short.videoUrl),
         ]
           .filter((value): value is string => Boolean(value && value.startsWith('http')))
@@ -229,7 +240,7 @@ function ShortsPageContent() {
     return () => {
       createdLinks.forEach(link => link.remove())
     }
-  }, [selectedChat?.cover_output_url, shorts])
+  }, [selectedChat, shorts])
 
   useEffect(() => { setSelectedChatId(requestedChatId) }, [requestedChatId])
 
@@ -476,7 +487,7 @@ function ShortsShell({
             <h1 className={styles.sidebarTitle}>{isAuthenticated ? 'Your shorts' : 'General shorts'}</h1>
             {authError ? (
               <p className={styles.sidebarStateCopy}>
-                Google sign-in is not enabled on this Supabase project yet. Add the Google provider credentials in Supabase Auth and try again.
+                Google sign-in did not complete. Try the login flow again, and if it still fails, reopen the login page and retry from there.
               </p>
             ) : null}
           </div>
@@ -1315,7 +1326,7 @@ function InfoRow({ label, value, href, mono }: { label: string; value: string; h
 function ChatListCover({ chat }: { chat: ChatSummary }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const coverThumbnailUrl = chat.metadata?.cover_thumbnail_url ?? null
-  const coverUrl = chat.cover_output_url && !chat.cover_output_url.startsWith('file://') ? chat.cover_output_url : null
+  const coverUrl = resolveChatCoverVideoUrl(chat)
   const [isReady, setIsReady] = useState(false)
   const [hasFailed, setHasFailed] = useState(false)
 
@@ -1403,22 +1414,17 @@ function ChatListCover({ chat }: { chat: ChatSummary }) {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function mapStoredToShort(s: StoredChatShort): GeneratedShort {
-  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: s.previewUrl, thumbnailUrl: s.thumbnailUrl ?? null, updatedAt: s.createdAt, estimatedSeconds: null, subtitleStyle: null, subtitleFont: null, gameplayAsset: null }
+  return { id: `${s.batchId}-${s.itemId}`, title: s.title, source: s.sourceLabel, sourceUrl: s.sourceUrl ?? '#', batchId: s.batchId, itemId: s.itemId, videoUrl: buildBatchItemVideoProxyUrl(s.batchId, s.itemId), thumbnailUrl: s.thumbnailUrl ?? null, updatedAt: s.createdAt, estimatedSeconds: null, subtitleStyle: null, subtitleFont: null, gameplayAsset: null }
 }
 
 function mapAssetToShort(a: ChatGeneratedAsset): GeneratedShort {
-  const directVideoUrl =
-    a.output_url && a.output_url.startsWith('http')
-      ? a.output_url
-      : `/api/brainrot/batches/${a.batch_id}/items/${a.item_id}/video`
-
   return {
     id: `${a.batch_id}-${a.item_id}`,
     title: a.script?.title ?? a.title_hint ?? `Video ${a.item_index + 1}`,
     source: a.title_hint ?? a.source_url ?? `Chat ${a.chat_id.slice(0, 8)}`,
     sourceUrl: a.source_url ?? '#',
     batchId: a.batch_id, itemId: a.item_id,
-    videoUrl: directVideoUrl,
+    videoUrl: buildBatchItemVideoProxyUrl(a.batch_id, a.item_id),
     thumbnailUrl: a.render_metadata?.thumbnail_url ?? null,
     updatedAt: a.updated_at,
     estimatedSeconds: a.script?.estimated_seconds ?? null,

@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "backend",
+  "localEndpoint": "http://localhost:8000/",
+  "serverPort": 51598,
+  "executionArgs": {
+    "projectName": "backend-full-test-1",
+    "projectPath": "/Users/yashwanthkrishna/Desktop/Drafter/Backend",
+    "testIds": [],
+    "additionalInstruction": "MANDATORY API CONTRACT — follow EXACTLY:\n\nBATCHES: POST /v1/batches uses form-data NOT JSON: requests.post(url, data={'source_url':'...','count':'5'}). Response: {\"batch\":{\"id\":\"uuid\",...},\"items\":[...]}. batch_id path param must be valid UUID.\n\nASSETS: POST /v1/assets/upload (NOT /v1/assets). Multipart form. Required: file + kind (gameplay|music|font). Response: {\"asset\":{\"id\":\"uuid\",\"kind\":\"...\"}}\n\nAGENTS: POST /v1/agents/bootstrap no body. POST /v1/agents/webhooks/elevenlabs (PLURAL webhooks).\n\nCHATS — THIS IS CRITICAL:\nPOST /v1/chats JSON body. Response is NESTED: {\"chat\":{\"id\":\"uuid\",\"title\":\"...\"}}\nchat_id = response.json()['chat']['id']\nNEVER USE response.json()['chat_id'] — THAT KEY DOES NOT EXIST\nGET /v1/chats: {\"items\":[{\"id\":\"...\"},...]}\n\nENGAGEMENT: POST /v1/chats/{chat_id}/engagement requires item_id, viewer_id, session_id (strings). Response: {\"engagement\":{\"id\":\"...\"}}\n\nRECOMMENDATIONS: GET /v1/chats/{chat_id}/recommendations: {\"has_enough_data\":bool,...}\n\nSSE: DO NOT import sseclient. Use response.iter_lines().\n\nServer at http://localhost:8000.",
+    "serverMode": "development",
+    "envs": {
+      "API_KEY": "sk-user-v2EbfgfRfkDjY5Y44VOeEUccldtpbWPaZ-RVRy_VBKxgjtjblR3lYnufHr5UG0qM261BWKOS0kN9d9HRD9zcKWAAIUvR-ZAHndi0SyRlP9KRi8WSw_UYC8ViM0XZd9F2vOs"
+    }
+  },
+  "proxy": "http://cff75e00-6dbe-42d4-9cd9-de0f76e7c538:UwWsHKQTF84xTBHZ4TGfGtI97DEQokY5@tun.testsprite.com:8080"
+}

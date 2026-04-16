@@ -1,0 +1,18 @@
+{
+  "status": "init",
+  "scope": "codebase",
+  "type": "frontend",
+  "localEndpoint": "http://localhost:3000/",
+  "serverPort": 50970,
+  "executionArgs": {
+    "projectName": "deployed-website-test-2",
+    "projectPath": "/Users/yashwanthkrishna/Desktop/Drafter/website",
+    "testIds": [],
+    "additionalInstruction": "All test cases must navigate to the PRODUCTION Vercel deployment at https://draftr-website.vercel.app — NOT localhost. Use https://draftr-website.vercel.app as the base URL for every page navigation (e.g. https://draftr-website.vercel.app/login, https://draftr-website.vercel.app/shorts, https://draftr-website.vercel.app/chat etc.). Test the full auth flow, all frontend pages, navbar, video feed, shorts library, info panel, like/mute, open-in-tab, and logout against the live Vercel site.",
+    "serverMode": "production",
+    "envs": {
+      "API_KEY": "sk-user-v2EbfgfRfkDjY5Y44VOeEUccldtpbWPaZ-RVRy_VBKxgjtjblR3lYnufHr5UG0qM261BWKOS0kN9d9HRD9zcKWAAIUvR-ZAHndi0SyRlP9KRi8WSw_UYC8ViM0XZd9F2vOs"
+    }
+  },
+  "proxy": "http://85ca2386-9513-48d5-9ca6-84e998b3db58:2ZTItiAgsSQqVwkshhkzA1tbJdsBsrqT@tun.testsprite.com:8080"
+}
