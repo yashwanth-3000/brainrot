@@ -751,13 +751,18 @@ class CrewAIProducerFlow:
             if _starts_with_product_name(payload.narration_text, source_brief.canonical_title):
                 product_name_first_slots += 1
 
-            assigned_fact_tokens = [_content_tokens(fact) for fact in slot.cluster.facts[:8]]
+            assigned_fact_tokens = [
+                fact_tokens
+                for fact in slot.cluster.facts[:8]
+                if (fact_tokens := _content_tokens(fact))
+            ]
             fact_overlap_hits = 0
             for fact in payload.source_facts_used:
                 fact_tokens = _content_tokens(fact)
                 if any(len(fact_tokens & assigned_tokens) >= 2 for assigned_tokens in assigned_fact_tokens):
                     fact_overlap_hits += 1
-            if fact_overlap_hits < 2:
+            required_fact_overlap_hits = min(2, len(assigned_fact_tokens))
+            if required_fact_overlap_hits and fact_overlap_hits < required_fact_overlap_hits:
                 problems.append("source_facts_used drift away from the assigned section cluster")
 
             hook_tokens = _content_tokens(payload.hook)

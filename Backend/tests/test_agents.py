@@ -11,7 +11,7 @@ from brainrot_backend.core.models.domain import GeneratedBundle, IngestedSource,
 from brainrot_backend.core.models.domain import AnglePlan
 from brainrot_backend.core.models.enums import SourceKind
 from brainrot_backend.video_generator.integrations.elevenlabs import ElevenLabsAgentsClient
-from brainrot_backend.video_generator.services.agents import AgentService
+from brainrot_backend.video_generator.services.agents import AgentService, _should_fail_fast_after_crewai_generation_error
 from brainrot_backend.video_generator.workers.orchestrator import BatchOrchestrator
 
 
@@ -43,6 +43,100 @@ def test_build_narrator_override_only_sets_supported_flags():
 def test_build_narrator_override_can_switch_voice():
     override = build_narrator_override(premium_audio=False, voice_id="voice-123")
     assert override == {"tts": {"voice_id": "voice-123"}}
+
+
+def test_fail_fast_after_crewai_slot_repair_exhaustion():
+    assert _should_fail_fast_after_crewai_generation_error(
+        "CrewAI producer could not repair all slots: slot 5: source_facts_used drift away from the assigned section cluster"
+    )
+    assert not _should_fail_fast_after_crewai_generation_error("timed out calling the OpenAI API")
+
+
+def test_normalize_generated_bundle_trims_narration_to_validator_word_limit():
+    service = AgentService.__new__(AgentService)
+    service.settings = Settings()
+    raw_narration = " ".join(["word-one"] * 101)
+    bundle = GeneratedBundle(
+        source_brief=SourceBrief(
+            canonical_title="Introducing Claude Opus 4.7",
+            summary="Anthropic is shipping an updated Claude release.",
+            facts=[
+                "Anthropic says Claude Opus 4.7 improves on the prior release.",
+                "The company describes the release in terms of testing, migration, and compute planning.",
+            ],
+            entities=["Anthropic", "Claude Opus 4.7"],
+            tone="specific, fast, grounded",
+            do_not_drift=["Keep each script tied to its assigned article section."],
+            source_urls=["https://www.anthropic.com/news/claude-opus-4-7"],
+        ),
+        angles=[],
+        scripts=[
+            ScriptDraft(
+                title="Claude Opus 4.7 update",
+                hook="Anthropic says Claude Opus 4.7 improves on the prior release.",
+                narration_text=raw_narration,
+                caption_text="Claude update",
+                estimated_seconds=26,
+                visual_beats=["beat"],
+                music_tags=["music"],
+                gameplay_tags=["gameplay"],
+                source_facts_used=[
+                    "Anthropic says Claude Opus 4.7 improves on the prior release.",
+                    "The company describes the release in terms of testing, migration, and compute planning.",
+                ],
+                qa_notes=[],
+            )
+        ],
+    )
+
+    normalized_bundle, stats = service._normalize_generated_bundle(bundle)  # type: ignore[attr-defined]
+
+    assert stats["narration_repairs"] == 1
+    assert len(service._validate_generated_bundle.__globals__["WORD_PATTERN"].findall(normalized_bundle.scripts[0].narration_text)) == service.settings.script_max_words
+
+
+def test_normalize_generated_bundle_replaces_generic_hook_starter():
+    service = AgentService.__new__(AgentService)
+    service.settings = Settings()
+    bundle = GeneratedBundle(
+        source_brief=SourceBrief(
+            canonical_title="Introducing Claude Opus 4.7",
+            summary="Anthropic is shipping an updated Claude release.",
+            facts=[
+                "Testing for Claude Opus 4.7 focused on reliability under harder evaluation scenarios.",
+                "Anthropic says the release is intended to improve real use under pressure.",
+            ],
+            entities=["Anthropic", "Claude Opus 4.7"],
+            tone="specific, fast, grounded",
+            do_not_drift=["Keep each script tied to its assigned article section."],
+            source_urls=["https://www.anthropic.com/news/claude-opus-4-7"],
+        ),
+        angles=[],
+        scripts=[
+            ScriptDraft(
+                title="Testing Claude Opus 4.7",
+                hook="Introducing Claude Opus 4.7 for harder evaluations.",
+                narration_text=" ".join(["word"] * 85),
+                caption_text="testing update",
+                estimated_seconds=26,
+                visual_beats=["beat"],
+                music_tags=["music"],
+                gameplay_tags=["gameplay"],
+                source_facts_used=[
+                    "Testing for Claude Opus 4.7 focused on reliability under harder evaluation scenarios.",
+                    "Anthropic says the release is intended to improve real use under pressure.",
+                ],
+                qa_notes=[],
+            )
+        ],
+    )
+
+    normalized_bundle, stats = service._normalize_generated_bundle(bundle)  # type: ignore[attr-defined]
+    normalized_hook = normalized_bundle.scripts[0].hook.casefold()
+
+    assert stats["hook_repairs"] == 1
+    assert not normalized_hook.startswith("introducing ")
+    assert "testing" in normalized_hook or "claude opus 4" in normalized_hook
 
 
 def test_diversify_script_identity_rotates_intro_styles():

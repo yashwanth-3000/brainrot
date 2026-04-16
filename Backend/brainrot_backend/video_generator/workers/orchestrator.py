@@ -150,7 +150,7 @@ class BatchOrchestrator:
             )
 
             items = await self.repository.get_batch_items(batch_id)
-            render_semaphore = asyncio.Semaphore(self.settings.render_concurrency)
+            render_semaphore = asyncio.Semaphore(max(1, self.settings.render_concurrency))
             producer_semaphore = asyncio.Semaphore(max(1, self.settings.producer_chunk_concurrency))
             planning_lock = asyncio.Lock()
             render_tasks: list[asyncio.Task[None]] = []
@@ -480,19 +480,18 @@ class BatchOrchestrator:
         music,
         subtitle_preset: SubtitlePreset,
     ) -> None:
-        async with semaphore:
-            try:
-                await self._render_item(batch, item, gameplay, music, subtitle_preset)
-            except Exception as exc:
-                logger.error(
-                    "Item %s (index=%d) failed: %s", item.id, item.item_index, exc, exc_info=True,
-                )
-                await self.repository.update_batch_item(item.id, status=BatchItemStatus.FAILED, error=str(exc))
-                await self.events.publish(
-                    batch.id,
-                    BatchEventType.ERROR,
-                    {"item_id": item.id, "item_index": item.item_index, "message": str(exc)},
-                )
+        try:
+            await self._render_item(batch, item, gameplay, music, subtitle_preset, semaphore=semaphore)
+        except Exception as exc:
+            logger.error(
+                "Item %s (index=%d) failed: %s", item.id, item.item_index, exc, exc_info=True,
+            )
+            await self.repository.update_batch_item(item.id, status=BatchItemStatus.FAILED, error=str(exc))
+            await self.events.publish(
+                batch.id,
+                BatchEventType.ERROR,
+                {"item_id": item.id, "item_index": item.item_index, "message": str(exc)},
+            )
 
     async def _render_item(
         self,
@@ -501,6 +500,8 @@ class BatchOrchestrator:
         gameplay,
         music,
         subtitle_preset: SubtitlePreset,
+        *,
+        semaphore: asyncio.Semaphore,
     ) -> None:
         script = item.script if isinstance(item.script, ScriptDraft) else ScriptDraft.model_validate(item.script)
         logger.info("Rendering item %s (index=%d): %s", item.id, item.item_index, script.title)
@@ -566,47 +567,48 @@ class BatchOrchestrator:
             subtitle_track.preset.font_name,
         )
 
-        await self.repository.update_batch_item(item.id, status=BatchItemStatus.RENDERING)
-        render_started_at = time.perf_counter()
-        await self._publish_log(
-            batch.id,
-            stage="render",
-            message=f"Render started for item {item.id}.",
-            item_id=item.id,
-            item_index=item.item_index,
-            gameplay_asset_path=gameplay.path,
-            subtitle_style_label=subtitle_track.preset.label,
-            elapsed_seconds=0.0,
-        )
-        await self.events.publish(
-            batch.id,
-            BatchEventType.RENDER_STARTED,
-            {
-                "item_id": item.id,
-                "item_index": item.item_index,
-                "gameplay_asset_path": gameplay.path,
-                "music_asset_path": music.path if music else None,
-                "subtitle_style_id": subtitle_track.preset.id,
-                "subtitle_style_label": subtitle_track.preset.label,
-                "subtitle_animation": subtitle_track.preset.animation,
-                "subtitle_font_name": subtitle_track.preset.font_name,
-            },
-        )
+        async with semaphore:
+            await self.repository.update_batch_item(item.id, status=BatchItemStatus.RENDERING)
+            render_started_at = time.perf_counter()
+            await self._publish_log(
+                batch.id,
+                stage="render",
+                message=f"Render started for item {item.id}.",
+                item_id=item.id,
+                item_index=item.item_index,
+                gameplay_asset_path=gameplay.path,
+                subtitle_style_label=subtitle_track.preset.label,
+                elapsed_seconds=0.0,
+            )
+            await self.events.publish(
+                batch.id,
+                BatchEventType.RENDER_STARTED,
+                {
+                    "item_id": item.id,
+                    "item_index": item.item_index,
+                    "gameplay_asset_path": gameplay.path,
+                    "music_asset_path": music.path if music else None,
+                    "subtitle_style_id": subtitle_track.preset.id,
+                    "subtitle_style_label": subtitle_track.preset.label,
+                    "subtitle_animation": subtitle_track.preset.animation,
+                    "subtitle_font_name": subtitle_track.preset.font_name,
+                },
+            )
 
-        output_path = await self._await_with_render_heartbeat(
-            self.renderer.render(
-                gameplay_path=gameplay_path,
-                music_path=music_path,
-                narration_path=narration_path,
-                subtitle_path=subtitle_track.path,
-                fonts_dir=subtitle_font_dir,
-                output_path=item_dir / "final.mp4",
-            ),
-            batch_id=batch.id,
-            item_id=item.id,
-            item_index=item.item_index,
-            started_at=render_started_at,
-        )
+            output_path = await self._await_with_render_heartbeat(
+                self.renderer.render(
+                    gameplay_path=gameplay_path,
+                    music_path=music_path,
+                    narration_path=narration_path,
+                    subtitle_path=subtitle_track.path,
+                    fonts_dir=subtitle_font_dir,
+                    output_path=item_dir / "final.mp4",
+                ),
+                batch_id=batch.id,
+                item_id=item.id,
+                item_index=item.item_index,
+                started_at=render_started_at,
+            )
         await self._publish_log(
             batch.id,
             stage="render",

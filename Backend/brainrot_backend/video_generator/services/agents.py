@@ -33,6 +33,9 @@ from brainrot_backend.core.storage.base import BlobStore, Repository
 
 logger = logging.getLogger(__name__)
 WORD_PATTERN = re.compile(r"[A-Za-z0-9]+(?:['-][A-Za-z0-9]+)*")
+NON_RETRYABLE_CREWAI_ERROR_MARKERS = (
+    "crewai producer could not repair all slots",
+)
 GENERIC_HOOK_STARTERS = (
     "meet ",
     "introducing ",
@@ -156,6 +159,11 @@ HOOK_STOPWORDS = {
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _should_fail_fast_after_crewai_generation_error(error: str) -> bool:
+    normalized = " ".join(error.split()).casefold()
+    return any(marker in normalized for marker in NON_RETRYABLE_CREWAI_ERROR_MARKERS)
 
 
 class AgentService:
@@ -340,6 +348,21 @@ class AgentService:
                         "Producer request failed for batch %s on attempt %d/3: %s",
                         batch_id, attempt, generation_exc,
                     )
+                    if (
+                        self.settings.producer_mode == "direct_openai"
+                        and _should_fail_fast_after_crewai_generation_error(last_error)
+                    ):
+                        await self._publish_log(
+                            batch_id,
+                            stage="producer",
+                            message=f"CrewAI producer exhausted slot repair on attempt {attempt}/3{label_suffix}. Handing control back to slice recovery.",
+                            attempt=attempt,
+                            elapsed_seconds=round(time.perf_counter() - started_at, 1),
+                            error=_truncate_log_text(last_error),
+                            mode=self.settings.producer_mode,
+                            **({"source": producer_label} if producer_label else {}),
+                        )
+                        raise RuntimeError(last_error) from generation_exc
                     await self._publish_log(
                         batch_id,
                         stage="producer",
@@ -1135,7 +1158,18 @@ class AgentService:
                 title_repairs += 1
 
             normalized_hook = script.hook.strip()
-            if cleaned_facts and not _hook_mentions_source_fact(normalized_hook, cleaned_facts):
+            normalized_hook_text = _normalize_script_text(normalized_hook)
+            matched_hook_starter = next(
+                (starter for starter in GENERIC_HOOK_STARTERS if normalized_hook_text.startswith(starter)),
+                None,
+            )
+            uses_canned_hook_phrase = any(phrase in normalized_hook_text for phrase in GENERIC_CANNED_HOOK_PHRASES)
+            if cleaned_facts and (
+                not _hook_mentions_source_fact(normalized_hook, cleaned_facts)
+                or matched_hook_starter is not None
+                or uses_canned_hook_phrase
+                or normalized_hook_text == _normalize_script_text(script.title)
+            ):
                 grounded_hook = _build_grounded_hook(script, cleaned_facts)
                 if grounded_hook and grounded_hook != normalized_hook:
                     normalized_hook = grounded_hook
@@ -1147,6 +1181,10 @@ class AgentService:
                 summary=bundle.source_brief.summary,
                 min_words=self.settings.script_min_words,
                 min_characters=self.settings.script_min_characters,
+            )
+            normalized_narration = _trim_narration_text_to_max_words(
+                normalized_narration,
+                max_words=self.settings.script_max_words,
             )
             if normalized_narration != script.narration_text:
                 narration_repairs += 1
@@ -1774,6 +1812,19 @@ def _expand_narration_text(
         expanded = f"{expanded} {fact_sentences.pop(0)}".strip()
 
     return expanded
+
+
+def _trim_narration_text_to_max_words(text: str, *, max_words: int) -> str:
+    normalized = " ".join(text.split()).strip()
+    matches = list(WORD_PATTERN.finditer(normalized))
+    if len(matches) <= max_words:
+        return normalized
+
+    cutoff = matches[max_words - 1].end()
+    trimmed = normalized[:cutoff].rstrip(",;:")
+    if trimmed and trimmed[-1] not in ".!?":
+        trimmed = f"{trimmed}."
+    return trimmed
 
 
 def _hook_mentions_source_fact(hook: str, facts: list[str]) -> bool:

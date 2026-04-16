@@ -45,8 +45,9 @@ class FFmpegRenderer:
         _, stderr = await process.communicate()
         if process.returncode != 0:
             error_text = stderr.decode("utf-8", errors="ignore")
-            logger.error("FFmpeg failed (rc=%d): %s", process.returncode, error_text[-2000:])
-            raise RuntimeError(f"FFmpeg render failed: {error_text[-1000:]}")
+            failure_summary = _format_ffmpeg_failure(process.returncode, error_text)
+            logger.error("FFmpeg failed (rc=%d): %s", process.returncode, failure_summary)
+            raise RuntimeError(f"FFmpeg render failed: {failure_summary}")
         logger.info("FFmpeg render complete: %s", output_path)
         return output_path
 
@@ -125,3 +126,13 @@ def build_subtitle_filter(subtitle_path: Path, fonts_dir: Path | None) -> str:
         return f"subtitles='{subtitle_arg}'"
     fonts_arg = escape_filter_path(fonts_dir)
     return f"subtitles='{subtitle_arg}':fontsdir='{fonts_arg}'"
+
+
+def _format_ffmpeg_failure(returncode: int, error_text: str) -> str:
+    clipped = error_text[-1200:].strip()
+    if returncode < 0:
+        signal_number = -returncode
+        if clipped:
+            return f"process was killed by signal {signal_number}. Last FFmpeg output: {clipped}"
+        return f"process was killed by signal {signal_number}"
+    return clipped or f"process exited with code {returncode}"

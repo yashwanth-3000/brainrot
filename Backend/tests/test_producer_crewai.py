@@ -274,6 +274,78 @@ def test_stabilize_payload_reanchors_hook_and_facts_to_assigned_section():
     assert not any("source_facts_used drift away" in problem for issue in issues for problem in issue.problems)
 
 
+def test_validate_slot_payloads_allows_single_fact_clusters_to_pass_grounding():
+    settings = Settings()
+    flow = CrewAIProducerFlow(settings=settings)
+    assigned_fact = "Anthropic expanded its partnership with Google and Broadcom for multiple gigawatts of next-generation compute."
+    slot = CoverageSlotPlan(
+        slot_index=4,
+        slot_id="slot-5",
+        angle_family="risk",
+        semantic_objective="risk",
+        hook_direction="constraint-first",
+        audience_frame="builders",
+        visual_mood="serious",
+        music_mood="driving",
+        cluster=SectionCluster(
+            cluster_id="cluster-5",
+            position=5,
+            section_ids=["section-9"],
+            headings=["Compute partnership"],
+            section_summary="The section focuses on Anthropic expanding infrastructure partnerships for future compute capacity.",
+            facts=[assigned_fact],
+            entities=["Anthropic", "Google", "Broadcom"],
+            source_span={"start_line": 1, "end_line": 4},
+            priority_score=2.0,
+            raw_markdown="## Compute partnership",
+        ),
+    )
+    payload = CrewAIScriptPayload(
+        title="Anthropic expands compute capacity",
+        hook="Anthropic expands compute capacity with Google and Broadcom.",
+        narration_text=(
+            "Anthropic says it is expanding its partnership with Google and Broadcom for multiple gigawatts of next-generation compute. "
+            "That matters because model progress is no longer just about better training ideas. "
+            "It also depends on whether the company can lock in enough infrastructure to ship the next jump in capability without bottlenecks."
+        ),
+        caption_text="compute capacity",
+        visual_beats=["beat 1"],
+        music_tags=["driving"],
+        gameplay_tags=["serious"],
+        source_facts_used=[
+            assigned_fact,
+            "The company frames compute access as a real constraint on future model rollout and scaling.",
+        ],
+        qa_notes=[],
+    )
+    brief = SourceBrief(
+        canonical_title="Introducing Claude Opus 4.7",
+        summary="Anthropic expands its compute partnerships.",
+        facts=[assigned_fact],
+        entities=["Anthropic", "Google", "Broadcom"],
+        tone="specific, fast, grounded",
+        do_not_drift=["Keep each script tied to its assigned article section."],
+        source_urls=["https://www.anthropic.com/news/claude-opus-4-7"],
+    )
+
+    stabilized = flow._stabilize_payload(payload=payload, slot=slot, source_brief=brief)
+    issues = flow._validate_slot_payloads(
+        payloads={slot.slot_id: stabilized},
+        coverage_plan=CoveragePlan(
+            requested_count=5,
+            planned_count=5,
+            actual_count=1,
+            section_count=1,
+            sections=[],
+            slots=[slot],
+            fallback_flags=[],
+        ),
+        source_brief=brief,
+    )
+
+    assert not any("source_facts_used drift away" in problem for issue in issues for problem in issue.problems)
+
+
 def test_stabilize_payload_trims_narration_to_max_words():
     settings = Settings()
     flow = CrewAIProducerFlow(settings=settings)
