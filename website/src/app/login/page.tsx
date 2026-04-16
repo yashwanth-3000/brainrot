@@ -121,8 +121,8 @@ function LoginPageContent() {
           {!auth.isAuthenticated ? (
             <form className={styles.passwordCard} onSubmit={handlePasswordLogin}>
               <div className={styles.passwordHeader}>
-                <p className={styles.passwordEyebrow}>Test account login</p>
-                <h2 className={styles.passwordTitle}>Use email and password for direct Supabase testing.</h2>
+                <p className={styles.passwordEyebrow}>Email sign-in</p>
+                <h2 className={styles.passwordTitle}>Sign in with email and password.</h2>
               </div>
 
               <div className={styles.fieldGroup}>
@@ -132,7 +132,7 @@ function LoginPageContent() {
                   type="email"
                   className={styles.fieldInput}
                   autoComplete="email"
-                  placeholder="test-auth@example.com"
+                  placeholder="Enter your email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                 />
@@ -145,7 +145,7 @@ function LoginPageContent() {
                   type="password"
                   className={styles.fieldInput}
                   autoComplete="current-password"
-                  placeholder="Enter your test password"
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                 />
@@ -157,7 +157,7 @@ function LoginPageContent() {
 
               <button type="submit" className={styles.passwordSubmit} disabled={isPasswordSubmitting}>
                 <KeyRound size={14} />
-                {isPasswordSubmitting ? "Signing in..." : "Login with email"}
+                {isPasswordSubmitting ? "Signing in..." : "Sign in with email"}
               </button>
             </form>
           ) : null}
