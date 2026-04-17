@@ -4,14 +4,16 @@
 **Date:** 2026-04-14  
 **Test Suites Run:** 4 (Frontend deployed, Video Generator, Recommendation System, Full Backend)
 
-This report retains all listed items as valid TestSprite/MCP issues or workflow limitations encountered during testing, including Issues 4, 5, 6, and 8.
+This report summarizes the confirmed TestSprite and MCP issues encountered while testing Draftr across the frontend and backend suites. The goal is to clearly separate real product bugs from tooling-related failures so future runs are easier to interpret and less likely to waste time or credits.
+
+Each issue listed below was observed during actual test execution and had a concrete effect on results, such as false failures, broken generated test code, or extra reruns. Where a workaround was found, it is included so the next round of testing can be more reliable.
 
 ---
 
 ## 1. Code Generation Ignores Explicit Response Shape Instructions
 
 **Severity:** High — causes consistent test failures  
-**Affected Runs:** Video Generator (TC009, TC010), Recommendation System (TC001, TC004), Full Backend (TC013)
+**Affected Runs:** Video Generator ([TC009](../Backend/brainrot_backend/video_generator/testsprite_tests/TC009_post_v1_chats_create_and_list.py), [TC010](../Backend/brainrot_backend/video_generator/testsprite_tests/TC010_post_v1_chats_chatid_engagement_tracking.py)), Recommendation System ([TC001](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC001_post_v1_chats_create_and_get_chat.py), [TC004](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC004_post_v1_chats_chatid_engagement_valid.py)), Full Backend ([TC013](../Backend/testsprite_tests/TC013_post_v1_chats_engagement_and_recommendations.py))
 
 TestSprite's code generator ignores explicit `additionalInstruction` about nested JSON response shapes. Despite instructions like:
 
@@ -23,7 +25,7 @@ TestSprite still generates:
 chat_id = response.json()["chat_id"]  # WRONG — key doesn't exist
 ```
 
-**Evidence of inconsistency:** In the same run, some tests correctly generated `response.json()["chat"]["id"]` (TC003, TC006 in recommendation system) while others in the same batch used the wrong `response.json()["chat_id"]` (TC001, TC004). The instructions were identical for all tests.
+**Evidence of inconsistency:** In the same run, some tests correctly generated `response.json()["chat"]["id"]` ([TC003](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC003_get_v1_chats_chatid_shorts_empty.py), [TC006](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC006_get_v1_chats_chatid_recommendations_insufficient_data.py) in recommendation system) while others in the same batch used the wrong `response.json()["chat_id"]` ([TC001](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC001_post_v1_chats_create_and_get_chat.py), [TC004](../Backend/brainrot_backend/recommendation_system/testsprite_tests/TC004_post_v1_chats_chatid_engagement_valid.py)). The instructions were identical for all tests.
 
 **Impact:** 5+ tests failed across 3 separate runs purely due to this. The backend API was verified correct in every case — the failing test's own error message printed the actual response showing `{"chat": {"id": "..."}}`.
 
@@ -112,66 +114,6 @@ The endpoint uses FastAPI `Form(...)` parameters, not a JSON body. Sending JSON 
 
 ---
 
-## 6. Test Execution Produces Empty Code (Timeout/Silent Failure)
-
-**Severity:** High — entire run wasted  
-**Affected Run:** Recommendation System test-1 (first attempt, all 7 tests)
-
-All 7 tests returned with `"code": ""` (empty string) and `"testError": "Test execution failed or timed out"`. The tests were created on the TestSprite platform but no code was ever generated. Timestamps show tests were marked failed within 200ms of creation — far too fast for actual code generation.
-
-```json
-{
-  "code": "",
-  "testStatus": "FAILED",
-  "testError": "Test execution failed or timed out",
-  "created": "2026-04-14T05:38:33.589Z",
-  "modified": "2026-04-14T05:38:33.780Z"
-}
-```
-
-The tunnel was established successfully and the probe passed. Credits were available (342 remaining). No error in `mcp.log` indicated a cause.
-
-**Workaround:** Cleared `test_results.json`, `raw_report.md`, and `mcp.log` from `tmp/`, then re-ran. The second attempt worked normally and generated code for all 7 tests.
-
----
-
-## 7. Tunnel Probe Returns 503 on First Attempt
-
-**Severity:** Low — auto-recovers  
-**Affected Runs:** Every single run
-
-Every test execution shows this warning on the first tunnel probe:
-
-```
-[WARN] Tunnel probe attempt 1 failed: Tunnel returned 503: Tunnel client is not connected to the server — retrying in 3s...
-```
-
-The second probe always succeeds. This adds ~3 seconds of unnecessary delay to every run but does not cause failures.
-
----
-
-## 8. No Way to Provide Exact Test Code
-
-**Severity:** Medium
-
-TestSprite generates test code from descriptions. There is no mechanism to provide exact test code to run. When the code generator makes mistakes (wrong paths, wrong field names, wrong content types), the only recourse is to make the description more explicit and re-run — consuming credits and time.
-
-For the chat `response.json()["chat"]["id"]` issue, we ran 5 separate attempts across 3 test suites and the code generator still produced incorrect code ~40% of the time, despite identical and extremely explicit instructions.
-
----
-
-## Generated Test Reports
-
-| Report | Location | Result |
-|--------|----------|--------|
-| Frontend (Deployed) | `website/testsprite_tests/testsprite-mcp-test-report-deployed-2.md` | 21/24 passed (87.5%) |
-| Video Generator (Run 1) | `Backend/brainrot_backend/video_generator/testsprite_tests/testsprite-mcp-test-report-video-generator-1.md` | 1/10 passed (10%) — pre-fix |
-| Video Generator (Run 2) | `Backend/brainrot_backend/video_generator/testsprite_tests/testsprite-mcp-test-report-video-generator-2.md` | 8/10 passed (80%) — post-fix |
-| Recommendation System | `Backend/brainrot_backend/recommendation_system/testsprite_tests/testsprite-mcp-test-report-recommendation-system-1.md` | 5/7 passed (71%) |
-| Full Backend | `Backend/testsprite_tests/testsprite-mcp-test-report-full-backend-1.md` | 13/15 passed (86%) |
-
----
-
 ## Issues Summary
 
 | Issue | Severity | Workaround Available | Credits Wasted |
@@ -181,6 +123,3 @@ For the chat `response.json()["chat"]["id"]` issue, we ran 5 separate attempts a
 | Invents fake auth tokens | Medium | Likely — not re-tested | ~10 |
 | Wrong API paths | High | Yes — exact paths in description | ~40 |
 | Wrong content-type (JSON vs form-data) | High | Yes — explicit instruction | ~10 |
-| Empty code / silent timeout | High | Retry after clearing tmp/ | ~7 |
-| Tunnel 503 on first probe | Low | Auto-recovers | 0 |
-| No exact test code mechanism | Medium | N/A | N/A |

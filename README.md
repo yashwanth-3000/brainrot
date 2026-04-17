@@ -13,7 +13,7 @@ To make sure the system behaved reliably, I used TestSprite to test the website 
 ## Demo
 
 - Live Demo: [draftr-website.vercel.app](https://draftr-website.vercel.app)
-- Backend Health: [backend-production-0c81d.up.railway.app/health](https://backend-production-0c81d.up.railway.app/health)
+- Demo Video: [youtu.be/66YCp-HzBOg](https://youtu.be/66YCp-HzBOg)
 
 ## Repository Overview
 
@@ -94,10 +94,10 @@ We used TestSprite as a repeated product-feedback loop, not as one final QA step
 
 ### Where the test data lives
 
-- `website/testsprite_tests/`
-- `Backend/brainrot_backend/recommendation_system/testsprite_tests/`
-- `Backend/brainrot_backend/video_generator/testsprite_tests/`
-- `Backend/testsprite_tests/`
+- [`website/testsprite_tests/`](website/testsprite_tests/)
+- [`Backend/brainrot_backend/recommendation_system/testsprite_tests/`](Backend/brainrot_backend/recommendation_system/testsprite_tests/)
+- [`Backend/brainrot_backend/video_generator/testsprite_tests/`](Backend/brainrot_backend/video_generator/testsprite_tests/)
+- [`Backend/testsprite_tests/`](Backend/testsprite_tests/)
 - [`testsprite/testsprite.md`](testsprite/testsprite.md)
 - [`testsprite/testsprite-mcp-issues-report.md`](testsprite/testsprite-mcp-issues-report.md)
 

@@ -6,21 +6,21 @@ The short version is this: across the 11 recorded dashboard runs, we executed 14
 
 ## What Lives In This Folder
 
-- `testsprite.md` — this consolidated write-up
-- `testsprite-mcp-issues-report.md` — the separate issues report focused on TestSprite generator and tunnel limitations
+- [`testsprite.md`](./testsprite.md) — this consolidated write-up
+- [`testsprite-mcp-issues-report.md`](./testsprite-mcp-issues-report.md) — the separate issues report focused on TestSprite generator and tunnel limitations
 
 ## Where The Main Test Artifacts Live
 
 The raw TestSprite suites and reports are still stored with the parts of the product they tested:
 
-- `website/testsprite_tests/`
-- `Backend/brainrot_backend/recommendation_system/testsprite_tests/`
-- `Backend/brainrot_backend/video_generator/testsprite_tests/`
-- `Backend/testsprite_tests/`
+- [`website/testsprite_tests/`](../website/testsprite_tests/)
+- [`Backend/brainrot_backend/recommendation_system/testsprite_tests/`](../Backend/brainrot_backend/recommendation_system/testsprite_tests/)
+- [`Backend/brainrot_backend/video_generator/testsprite_tests/`](../Backend/brainrot_backend/video_generator/testsprite_tests/)
+- [`Backend/testsprite_tests/`](../Backend/testsprite_tests/)
 
 Other supporting project-level files:
 
-- `testsprite/testsprite-mcp-issues-report.md` — the consolidated limitations/issues report
+- [`testsprite/testsprite-mcp-issues-report.md`](./testsprite-mcp-issues-report.md) — the consolidated limitations/issues report
 
 ## Testing Coverage At A Glance
 
@@ -139,32 +139,32 @@ That is why we kept a separate issues report alongside this file. The product cl
 
 ### Website
 
-- Main suite folder: `website/testsprite_tests/`
+- Main suite folder: [`website/testsprite_tests/`](../website/testsprite_tests/)
 - Key reports:
-  - `testsprite-mcp-test-report-3.md` — local website run 3 (`11/15`)
-  - `testsprite-mcp-test-report-deployed-2.md` — deployed website run (`21/24`)
+  - [`testsprite-mcp-test-report-3.md`](../website/testsprite_tests/testsprite-mcp-test-report-3.md) — local website run 3 (`11/15`)
+  - [`testsprite-mcp-test-report-deployed-2.md`](../website/testsprite_tests/testsprite-mcp-test-report-deployed-2.md) — deployed website run (`21/24`)
 - Note: the earlier local `6/15` and `8/15` runs are preserved in the project summary and hackathon script, even though only the later local report is stored as a standalone markdown report in the repo
 
 ### Recommendation system
 
-- Suite folder: `Backend/brainrot_backend/recommendation_system/testsprite_tests/`
+- Suite folder: [`Backend/brainrot_backend/recommendation_system/testsprite_tests/`](../Backend/brainrot_backend/recommendation_system/testsprite_tests/)
 - Key report:
-  - `testsprite-mcp-test-report-recommendation-system-1.md` — verified recommendation run (`5/7`)
+  - [`testsprite-mcp-test-report-recommendation-system-1.md`](../Backend/brainrot_backend/recommendation_system/testsprite_tests/testsprite-mcp-test-report-recommendation-system-1.md) — verified recommendation run (`5/7`)
 - Supporting evidence for the broken first attempt lives in:
-  - `testsprite/testsprite-mcp-issues-report.md`
+  - [`testsprite/testsprite-mcp-issues-report.md`](./testsprite-mcp-issues-report.md)
 
 ### Video generator
 
-- Suite folder: `Backend/brainrot_backend/video_generator/testsprite_tests/`
+- Suite folder: [`Backend/brainrot_backend/video_generator/testsprite_tests/`](../Backend/brainrot_backend/video_generator/testsprite_tests/)
 - Key reports:
-  - `testsprite-mcp-test-report-video-generator-1.md` — first run (`1/10`)
-  - `testsprite-mcp-test-report-video-generator-2.md` — post-fix run (`8/10`)
+  - [`testsprite-mcp-test-report-video-generator-1.md`](../Backend/brainrot_backend/video_generator/testsprite_tests/testsprite-mcp-test-report-video-generator-1.md) — first run (`1/10`)
+  - [`testsprite-mcp-test-report-video-generator-2.md`](../Backend/brainrot_backend/video_generator/testsprite_tests/testsprite-mcp-test-report-video-generator-2.md) — post-fix run (`8/10`)
 
 ### Full backend
 
-- Suite folder: `Backend/testsprite_tests/`
+- Suite folder: [`Backend/testsprite_tests/`](../Backend/testsprite_tests/)
 - Key report:
-  - `testsprite-mcp-test-report-full-backend-1.md` — consolidated backend run (`13/15`)
+  - [`testsprite-mcp-test-report-full-backend-1.md`](../Backend/testsprite_tests/testsprite-mcp-test-report-full-backend-1.md) — consolidated backend run (`13/15`)
 
 ## Final Takeaway
 
