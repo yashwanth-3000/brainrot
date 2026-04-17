@@ -41,6 +41,7 @@ class CoverageSlotPlan(BaseModel):
     visual_mood: str
     music_mood: str
     cluster: SectionCluster
+    anchor_fact: str = ""
     forbidden_overlap_section_ids: list[str] = Field(default_factory=list)
     forbidden_overlap_facts: list[str] = Field(default_factory=list)
 

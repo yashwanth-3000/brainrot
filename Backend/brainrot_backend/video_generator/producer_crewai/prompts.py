@@ -31,7 +31,9 @@ def repair_system_prompt() -> str:
 def build_writer_task_prompt(*, slot: CoverageSlotPlan, source_title: str, canonical_summary: str, section_count: int) -> str:
     cluster = slot.cluster
     cluster_headings = ", ".join(cluster.headings)
-    cluster_facts = "\n".join(f"- {fact}" for fact in cluster.facts[:8]) or "- No explicit facts extracted"
+    anchor_fact = slot.anchor_fact or (cluster.facts[0] if cluster.facts else cluster.section_summary)
+    secondary_facts = [fact for fact in cluster.facts[:8] if fact != anchor_fact]
+    cluster_facts = "\n".join(f"- {fact}" for fact in secondary_facts[:7]) or "- No additional facts extracted"
     forbidden_sections = ", ".join(slot.forbidden_overlap_section_ids[:8]) or "none"
     forbidden_facts = "\n".join(f"- {fact}" for fact in slot.forbidden_overlap_facts[:6]) or "- none"
     return (
@@ -48,16 +50,19 @@ def build_writer_task_prompt(*, slot: CoverageSlotPlan, source_title: str, canon
         f"Assigned section ids: {', '.join(cluster.section_ids)}\n"
         f"Assigned section headings: {cluster_headings}\n"
         f"Assigned section summary: {cluster.section_summary}\n\n"
-        f"Facts to use from this section cluster:\n{cluster_facts}\n\n"
+        f"PRIMARY ANCHOR FACT (this slot owns it — no other slot will use it):\n- {anchor_fact}\n\n"
+        f"Supporting facts from this section cluster (use one or more alongside the anchor):\n{cluster_facts}\n\n"
         f"Do not overlap with these other article sections unless absolutely necessary: {forbidden_sections}\n"
-        f"Do not center the hook on these already-used fact patterns:\n{forbidden_facts}\n\n"
+        f"Other slots already own these anchor facts — do NOT build the hook, title, or opening around them:\n{forbidden_facts}\n\n"
         f"Cluster source markdown:\n{cluster.raw_markdown}\n\n"
         "Hard requirements:\n"
         "- Return one script only.\n"
         "- Keep narration_text between 80 and 100 words.\n"
         "- Keep narration_text at least 500 characters.\n"
-        "- Use at least two concrete facts from the assigned section cluster in source_facts_used.\n"
-        "- The hook must be grounded in those same facts.\n"
+        "- source_facts_used MUST start with the PRIMARY ANCHOR FACT verbatim (or a minimally reworded version of it) as the first item.\n"
+        "- Include at least one additional supporting fact from the cluster in source_facts_used.\n"
+        "- The hook and title must be meaningfully distinct from any of the forbidden anchor facts above.\n"
+        "- The hook must clearly reference the anchor fact's unique detail (the word or phrase that distinguishes it).\n"
         "- The opening sentence must not restate the title or the hook.\n"
         "- Avoid starting with the product name unless this slot absolutely requires it.\n"
         "- Cover this part of the article, not the whole product pitch.\n"
@@ -82,6 +87,8 @@ def build_repair_task_prompt(
     validation_feedback: str,
 ) -> str:
     cluster = slot.cluster
+    anchor_fact = slot.anchor_fact or (cluster.facts[0] if cluster.facts else cluster.section_summary)
+    forbidden_facts = "\n".join(f"- {fact}" for fact in slot.forbidden_overlap_facts[:6]) or "- none"
     return (
         f"Source title: {source_title}\n"
         f"Global source summary: {canonical_summary}\n"
@@ -90,11 +97,13 @@ def build_repair_task_prompt(
         f"Assigned semantic objective: {slot.semantic_objective}\n"
         f"Assigned section headings: {', '.join(cluster.headings)}\n"
         f"Assigned section summary: {cluster.section_summary}\n"
-        f"Assigned section facts:\n" + "\n".join(f"- {fact}" for fact in cluster.facts[:8]) + "\n\n"
+        f"PRIMARY ANCHOR FACT (unique to this slot):\n- {anchor_fact}\n"
+        f"Assigned section facts:\n" + "\n".join(f"- {fact}" for fact in cluster.facts[:8]) + "\n"
+        f"Anchor facts owned by other slots — do NOT build the hook/title/opening around them:\n{forbidden_facts}\n\n"
         f"Current script JSON:\n{current_script_json}\n\n"
         f"Validation feedback:\n{validation_feedback}\n\n"
-        "Rewrite only this slot so it stays anchored to the assigned section cluster, fixes the validation problems, "
-        "and stays meaningfully different in semantic angle from the other slots. "
-        "Do not fall back to generic product-marketing phrasing during repair. "
+        "Rewrite only this slot so it stays anchored to the PRIMARY ANCHOR FACT above, puts that fact first in "
+        "source_facts_used, fixes the validation problems, and stays meaningfully different in semantic angle "
+        "from the other slots. Do not fall back to generic product-marketing phrasing during repair. "
         "Return one repaired structured script only."
     )

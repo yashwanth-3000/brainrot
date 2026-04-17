@@ -170,6 +170,11 @@ class CrewAIProducerFlow:
             publish_event=publish_event,
             publish_log=publish_log,
         )
+        self._enforce_cross_slot_uniqueness(
+            payloads=initial_payloads,
+            coverage_plan=coverage_plan,
+            source_brief=source_brief,
+        )
         issues = self._validate_slot_payloads(
             payloads=initial_payloads,
             coverage_plan=coverage_plan,
@@ -186,6 +191,11 @@ class CrewAIProducerFlow:
                 publish_log=publish_log,
             )
             initial_payloads.update(repaired_payloads)
+            self._enforce_cross_slot_uniqueness(
+                payloads=initial_payloads,
+                coverage_plan=coverage_plan,
+                source_brief=source_brief,
+            )
             issues = self._validate_slot_payloads(
                 payloads=initial_payloads,
                 coverage_plan=coverage_plan,
@@ -704,6 +714,110 @@ class CrewAIProducerFlow:
             },
         )
 
+    def _enforce_cross_slot_uniqueness(
+        self,
+        *,
+        payloads: dict[str, CrewAIScriptPayload],
+        coverage_plan: CoveragePlan,
+        source_brief: SourceBrief,
+    ) -> None:
+        """Guarantee that each slot has a unique primary fact, title, and hook.
+
+        The writer and repair agents run in parallel and have no knowledge of each
+        other's outputs, so they frequently converge on the same leading cluster
+        fact (and therefore the same title / hook). That collision is detected by
+        ``_validate_slot_payloads`` and repeatedly kicks the repair loop into an
+        unwinnable state. This pass resolves overlaps deterministically by walking
+        slots in order and, whenever a collision is detected, rotating the
+        colliding slot to a unique alternative drawn from its own cluster (or a
+        synthetic fallback so we never invent off-source claims).
+        """
+        if len(coverage_plan.slots) <= 1:
+            return
+
+        used_primary_facts: set[str] = set()
+        used_titles: set[str] = set()
+        used_hooks: set[str] = set()
+
+        for slot in coverage_plan.slots:
+            payload = payloads.get(slot.slot_id)
+            if payload is None:
+                continue
+
+            facts = list(payload.source_facts_used)
+            anchor_key = _fact_key(slot.anchor_fact) if slot.anchor_fact else ""
+            primary_key = _fact_key(facts[0]) if facts else ""
+
+            needs_reanchor = (
+                not primary_key
+                or primary_key in used_primary_facts
+                or (anchor_key and anchor_key not in used_primary_facts and primary_key != anchor_key)
+            )
+            if needs_reanchor:
+                picked: str | None = None
+                picked_key: str = ""
+                if anchor_key and anchor_key not in used_primary_facts:
+                    picked = slot.anchor_fact
+                    picked_key = anchor_key
+                if picked is None:
+                    candidate_pool = [
+                        *facts,
+                        *slot.cluster.facts,
+                        *source_brief.facts,
+                    ]
+                    for fact in candidate_pool:
+                        key = _fact_key(fact)
+                        if key and key not in used_primary_facts:
+                            picked = fact
+                            picked_key = key
+                            break
+                if picked is None:
+                    picked = _synthetic_primary_fact(slot=slot, source_brief=source_brief)
+                    picked_key = _fact_key(picked)
+                    suffix = 2
+                    while picked_key in used_primary_facts:
+                        picked = f"{picked} (angle: {slot.angle_family} #{suffix})"
+                        picked_key = _fact_key(picked)
+                        suffix += 1
+                facts = [picked, *[fact for fact in facts if _fact_key(fact) != picked_key]]
+                primary_key = picked_key
+            used_primary_facts.add(primary_key)
+
+            title = payload.title
+            title_key = _normalize_text(title)
+            if not title_key or title_key in used_titles:
+                title = _unique_title_for_slot(
+                    slot=slot,
+                    primary_fact=facts[0] if facts else slot.cluster.section_summary,
+                    used_titles=used_titles,
+                )
+                title_key = _normalize_text(title)
+            used_titles.add(title_key)
+
+            hook = payload.hook
+            hook_key = _normalize_text(hook)
+            if not hook_key or hook_key in used_hooks or hook_key == title_key:
+                hook = _unique_hook_for_slot(
+                    slot=slot,
+                    primary_fact=facts[0] if facts else slot.cluster.section_summary,
+                    used_hooks=used_hooks | {title_key},
+                )
+                hook_key = _normalize_text(hook)
+            used_hooks.add(hook_key)
+
+            if (
+                facts != payload.source_facts_used
+                or title != payload.title
+                or hook != payload.hook
+            ):
+                payloads[slot.slot_id] = payload.model_copy(
+                    update={
+                        "source_facts_used": facts[:6],
+                        "title": title,
+                        "hook": hook,
+                    }
+                )
+
     def _validate_slot_payloads(
         self,
         *,
@@ -853,11 +967,12 @@ class CrewAIProducerFlow:
         source_brief: SourceBrief,
     ) -> CrewAIScriptPayload:
         assigned_facts = _unique_text(slot.cluster.facts)[:6]
-        normalized_facts = _unique_text([*assigned_facts, *payload.source_facts_used])[:6]
+        anchor_seed = [slot.anchor_fact] if slot.anchor_fact else []
+        normalized_facts = _unique_text([*anchor_seed, *assigned_facts, *payload.source_facts_used])[:6]
         if len(normalized_facts) < 2 and source_brief.facts:
             normalized_facts = _unique_text([*normalized_facts, *source_brief.facts])[:6]
         grounding_facts = assigned_facts or normalized_facts or source_brief.facts
-        selected_fact = _select_best_fact_for_slot(
+        selected_fact = slot.anchor_fact or _select_best_fact_for_slot(
             slot=slot,
             facts=grounding_facts,
             product_name=source_brief.canonical_title,
@@ -913,6 +1028,66 @@ class CrewAIProducerFlow:
                 "source_facts_used": normalized_facts[:6],
             }
         )
+
+
+def _fact_key(value: str) -> str:
+    return " ".join(value.casefold().split()).strip().rstrip(".")
+
+
+def _synthetic_primary_fact(*, slot: CoverageSlotPlan, source_brief: SourceBrief) -> str:
+    heading = slot.cluster.headings[0] if slot.cluster.headings else source_brief.canonical_title
+    summary = (slot.cluster.section_summary or "").strip().rstrip(".")
+    if heading and summary:
+        return f"{heading}: {summary}"
+    return summary or heading or source_brief.canonical_title
+
+
+def _unique_title_for_slot(*, slot: CoverageSlotPlan, primary_fact: str, used_titles: set[str]) -> str:
+    base_heading = slot.cluster.headings[0] if slot.cluster.headings else slot.semantic_objective
+    angle = slot.angle_family.replace("-", " ").strip()
+    candidates = [
+        base_heading,
+        f"{base_heading} — {angle}",
+        _sentence_case(_compress_fact_for_hook(primary_fact)),
+        f"{base_heading} ({slot.slot_id})",
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        cleaned = _scrub_marketing_phrases(" ".join(candidate.split()).strip())
+        key = _normalize_text(cleaned)
+        if key and key not in used_titles:
+            return cleaned
+    suffix = 2
+    while True:
+        candidate = f"{base_heading} — angle {suffix}"
+        key = _normalize_text(candidate)
+        if key not in used_titles:
+            return candidate
+        suffix += 1
+
+
+def _unique_hook_for_slot(*, slot: CoverageSlotPlan, primary_fact: str, used_hooks: set[str]) -> str:
+    fallback = _grounded_hook_for_slot(slot=slot, fact=primary_fact)
+    candidates = [
+        fallback,
+        _sentence_case(_compress_fact_for_hook(primary_fact)),
+        _sentence_case(_inline_clause_fact(primary_fact)),
+    ]
+    for candidate in candidates:
+        if not candidate:
+            continue
+        cleaned = _scrub_marketing_phrases(" ".join(candidate.split()).strip())
+        key = _normalize_text(cleaned)
+        if key and key not in used_hooks:
+            return cleaned
+    suffix = 2
+    while True:
+        candidate = f"{fallback} ({slot.angle_family} #{suffix})"
+        key = _normalize_text(candidate)
+        if key not in used_hooks:
+            return candidate
+        suffix += 1
 
 
 def _unique_text(values: list[str]) -> list[str]:

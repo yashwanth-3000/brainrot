@@ -476,6 +476,122 @@ def test_validate_generated_bundle_rejects_semantic_overlap_metadata():
         raise AssertionError("Expected semantic-overlap validation to fail.")
 
 
+DEVPOST_STYLE_COLLAPSED_MARKDOWN = """
+Agentic AI Hackathon Powered by Microsoft is a global online hackathon for builders who want to ship agentic applications.
+
+Participants will build, test, and publish multi-agent systems that can plan, use tools, and act on behalf of users.
+
+The sponsor provides access to Azure OpenAI, Microsoft Copilot Studio, and a pool of compute credits reserved for finalists.
+
+Eligible projects must integrate at least two agentic patterns: autonomous planning, tool use, retrieval grounding, or multi-agent coordination.
+
+Judging rewards working prototypes, clean architecture diagrams, and demos that show the agent handling a realistic failure path.
+
+Winners split a $150,000 prize pool and earn a mentoring session with the Azure AI Foundry team.
+
+The schedule runs five weeks with weekly office hours, a midpoint demo milestone, and a final submission gate 48 hours before judging.
+
+Submission rules require a short demo video, a public repo, a deployment link, and a one-page architecture writeup.
+"""
+
+
+def test_build_coverage_plan_assigns_unique_anchor_per_slot_for_collapsed_markdown():
+    """Regression for the devpost-style source that collapsed everything under the article title.
+
+    Previously the planner produced 5 clusters that all shared the same "first fact", which
+    triggered an unwinnable 'primary fact cluster overlaps with another slot' repair loop.
+    """
+    plan = build_coverage_plan(
+        title="Agentic AI Hackathon Powered by Microsoft",
+        markdown=DEVPOST_STYLE_COLLAPSED_MARKDOWN,
+        requested_count=5,
+    )
+
+    assert len(plan.slots) == 5
+
+    anchor_keys = [" ".join(slot.anchor_fact.casefold().split()).rstrip(".") for slot in plan.slots]
+    assert all(anchor_keys), "every slot must have an anchor fact"
+    assert len(set(anchor_keys)) == len(anchor_keys), (
+        f"slots must have globally unique anchor facts, got {anchor_keys}"
+    )
+
+    angle_families = [slot.angle_family for slot in plan.slots]
+    assert len(set(angle_families)) == len(angle_families), (
+        f"slots must have unique angle families, got {angle_families}"
+    )
+
+    headings = [slot.cluster.headings[0] for slot in plan.slots if slot.cluster.headings]
+    assert len(set(headings)) == len(headings), (
+        f"slots must have distinct primary headings even when source has no H1/H2, got {headings}"
+    )
+
+
+def test_enforce_cross_slot_uniqueness_rescues_colliding_payloads():
+    settings = Settings()
+    flow = CrewAIProducerFlow(settings=settings)
+    plan = build_coverage_plan(
+        title="Agentic AI Hackathon Powered by Microsoft",
+        markdown=DEVPOST_STYLE_COLLAPSED_MARKDOWN,
+        requested_count=5,
+    )
+    source_brief = SourceBrief(
+        canonical_title="Agentic AI Hackathon Powered by Microsoft",
+        summary="A hackathon for agentic apps sponsored by Microsoft.",
+        facts=[fact for slot in plan.slots for fact in slot.cluster.facts][:10],
+        entities=["Microsoft", "Azure"],
+        tone="specific, fast, grounded",
+        do_not_drift=["Keep each script tied to its assigned article section."],
+        source_urls=["https://ai-agentic-hackathon.devpost.com"],
+    )
+
+    duplicate_fact = plan.slots[0].cluster.facts[0] if plan.slots[0].cluster.facts else plan.slots[0].anchor_fact
+    payloads: dict[str, CrewAIScriptPayload] = {}
+    for slot in plan.slots:
+        payloads[slot.slot_id] = CrewAIScriptPayload(
+            title="Agentic hackathon overview",
+            hook="Build agentic apps with Microsoft",
+            narration_text="Agentic apps need planning, tool use, and grounded retrieval. " + ("word " * 85),
+            caption_text="agentic hackathon",
+            visual_beats=["beat 1"],
+            music_tags=["driving"],
+            gameplay_tags=["systematic"],
+            source_facts_used=[duplicate_fact, "Winners split a $150,000 prize pool"],
+            qa_notes=[],
+        )
+
+    flow._enforce_cross_slot_uniqueness(
+        payloads=payloads,
+        coverage_plan=plan,
+        source_brief=source_brief,
+    )
+
+    primary_keys = [
+        " ".join(payloads[slot.slot_id].source_facts_used[0].casefold().split()).rstrip(".")
+        for slot in plan.slots
+    ]
+    assert len(set(primary_keys)) == len(primary_keys), (
+        f"cross-slot coordinator must guarantee unique primary facts, got {primary_keys}"
+    )
+
+    titles = [payloads[slot.slot_id].title for slot in plan.slots]
+    hooks = [payloads[slot.slot_id].hook for slot in plan.slots]
+    assert len({title.casefold() for title in titles}) == len(titles)
+    assert len({hook.casefold() for hook in hooks}) == len(hooks)
+
+    issues = flow._validate_slot_payloads(
+        payloads=payloads,
+        coverage_plan=plan,
+        source_brief=source_brief,
+    )
+    overlap_problems = [
+        problem
+        for issue in issues
+        for problem in issue.problems
+        if "overlaps with another slot" in problem
+    ]
+    assert overlap_problems == [], f"no overlap problems expected, got {overlap_problems}"
+
+
 def test_build_crewai_llm_uses_max_completion_tokens_for_gpt5_models():
     llm = build_crewai_llm(
         model="gpt-5.4-mini",

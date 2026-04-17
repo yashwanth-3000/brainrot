@@ -193,15 +193,15 @@ def build_coverage_plan(*, title: str, markdown: str, requested_count: int) -> C
         fallback_flags.append("cluster_reuse")
 
     slots: list[CoverageSlotPlan] = []
-    used_facts: set[str] = set()
+    used_anchor_keys: set[str] = set()
+    used_anchor_texts: list[str] = []
     used_angle_families: set[str] = set()
     all_section_ids = [section.section_id for section in sections]
     for index, cluster in enumerate(clusters):
         profile = _select_angle_profile(cluster=cluster, index=index, used_angle_families=used_angle_families)
         used_angle_families.add(profile["id"])
-        cluster_facts = [fact for fact in cluster.facts if fact.casefold() not in used_facts]
-        if cluster_facts:
-            used_facts.add(cluster_facts[0].casefold())
+        anchor_fact = _allocate_anchor_fact(cluster=cluster, used_keys=used_anchor_keys)
+        used_anchor_keys.add(_fact_key(anchor_fact))
         slots.append(
             CoverageSlotPlan(
                 slot_index=index,
@@ -213,10 +213,12 @@ def build_coverage_plan(*, title: str, markdown: str, requested_count: int) -> C
                 visual_mood=profile["visual_mood"],
                 music_mood=profile["music_mood"],
                 cluster=cluster,
+                anchor_fact=anchor_fact,
                 forbidden_overlap_section_ids=[section_id for section_id in all_section_ids if section_id not in cluster.section_ids],
-                forbidden_overlap_facts=[fact for fact in used_facts if fact not in {entry.casefold() for entry in cluster.facts}],
+                forbidden_overlap_facts=list(used_anchor_texts),
             )
         )
+        used_anchor_texts.append(anchor_fact)
 
     return CoveragePlan(
         requested_count=requested_count,
@@ -326,7 +328,11 @@ def _ensure_minimum_sections(sections: list[ArticleSection], target_count: int) 
         if split_index is None:
             break
         target = expanded.pop(split_index)
-        pieces = _split_section(target)
+        existing_headings = {section.heading for section in expanded}
+        pieces = _split_section(target, existing_headings=existing_headings)
+        if len(pieces) <= 1:
+            expanded.insert(split_index, target)
+            break
         expanded[split_index:split_index] = pieces
     return expanded
 
@@ -378,7 +384,82 @@ def _cluster_sections(sections: list[ArticleSection], requested_count: int) -> l
                 raw_markdown=combined_markdown.strip(),
             )
         )
-    return clusters
+    return _deduplicate_cluster_facts(clusters)
+
+
+def _deduplicate_cluster_facts(clusters: list[SectionCluster]) -> list[SectionCluster]:
+    """Reorder each cluster's facts so its first fact is unique across the batch.
+
+    When the same article chunk is split into multiple clusters (e.g. because the
+    source markdown has few headings and had to be split to reach the requested
+    slot count), the naive fact list often shares the same leading fact across
+    several clusters. That guarantees a primary-fact-cluster collision downstream
+    and blocks the producer from ever settling. We pick a distinct anchor fact
+    per cluster up front so the writer and validator have room to converge.
+    """
+    if len(clusters) <= 1:
+        return clusters
+
+    used_primary: set[str] = set()
+    deduped: list[SectionCluster] = []
+    for cluster in clusters:
+        facts = list(cluster.facts)
+        anchor_index: int | None = None
+        for index, fact in enumerate(facts):
+            key = _fact_key(fact)
+            if key and key not in used_primary:
+                anchor_index = index
+                break
+        if anchor_index is None:
+            synthetic = _synthetic_anchor_fact(cluster)
+            if synthetic and _fact_key(synthetic) not in used_primary:
+                facts = [synthetic, *facts]
+                anchor_index = 0
+        if anchor_index is not None and anchor_index > 0:
+            anchor = facts.pop(anchor_index)
+            facts.insert(0, anchor)
+        if facts:
+            used_primary.add(_fact_key(facts[0]))
+        deduped.append(cluster.model_copy(update={"facts": facts[:8]}))
+    return deduped
+
+
+def _fact_key(fact: str) -> str:
+    return " ".join(fact.casefold().split()).strip().rstrip(".")
+
+
+def _synthetic_anchor_fact(cluster: SectionCluster) -> str:
+    heading = cluster.headings[0] if cluster.headings else ""
+    summary = cluster.section_summary.strip()
+    if heading and summary:
+        return f"{heading}: {summary}".strip()
+    return summary or heading
+
+
+def _allocate_anchor_fact(*, cluster: SectionCluster, used_keys: set[str]) -> str:
+    """Pick the cluster's primary anchor fact, guaranteed unique across slots.
+
+    The writer prompt is told to treat this as the required centerpiece of the
+    script, and the stabilizer/validator enforce it lands first in
+    ``source_facts_used``. Because we resolve the collision here — before any
+    LLM call — the producer avoids the "primary fact cluster overlaps" spiral
+    that previously forced the slice-recovery loop to abandon the batch.
+    """
+    for fact in cluster.facts:
+        key = _fact_key(fact)
+        if key and key not in used_keys:
+            return fact
+    synthetic = _synthetic_anchor_fact(cluster)
+    key = _fact_key(synthetic)
+    if not key or key in used_keys:
+        suffix = 2
+        base = synthetic or cluster.cluster_id
+        while True:
+            candidate = f"{base} (angle {suffix})"
+            if _fact_key(candidate) not in used_keys:
+                return candidate
+            suffix += 1
+    return synthetic
 
 
 def _select_sections_for_slots(sections: list[ArticleSection], requested_count: int) -> list[ArticleSection]:
@@ -508,7 +589,15 @@ def _find_best_split_candidate(sections: list[ArticleSection]) -> int | None:
     return best_index
 
 
-def _split_section(section: ArticleSection) -> list[ArticleSection]:
+SPLIT_HEADING_SUFFIX_RE = re.compile(r"\s*[—\-:]?\s*(?:part|detail)\s+\d+\s*$", re.IGNORECASE)
+
+
+def _strip_split_suffix(heading: str) -> str:
+    stripped = SPLIT_HEADING_SUFFIX_RE.sub("", heading).strip()
+    return stripped or heading
+
+
+def _split_section(section: ArticleSection, *, existing_headings: set[str] | None = None) -> list[ArticleSection]:
     paragraphs = _paragraphs(section.raw_markdown)
     if len(paragraphs) < 2:
         return [section]
@@ -517,15 +606,25 @@ def _split_section(section: ArticleSection) -> list[ArticleSection]:
     split_sections: list[ArticleSection] = []
     start_line = section.source_span.get("start_line", 1)
     line_cursor = start_line
-    for index, chunk in enumerate(chunks, start=1):
+    base_heading = _strip_split_suffix(section.heading)
+    occupied = {heading.casefold() for heading in (existing_headings or set())}
+    occupied.discard(section.heading.casefold())
+    next_part = 1
+    for chunk in chunks:
         body = "\n\n".join(chunk).strip()
         if not body:
             continue
         line_count = max(body.count("\n") + 1, 1)
-        heading = section.heading if index == 1 else f"{section.heading}: detail {index}"
+        while True:
+            candidate = f"{base_heading} — part {next_part}"
+            next_part += 1
+            if candidate.casefold() not in occupied:
+                heading = candidate
+                occupied.add(candidate.casefold())
+                break
         split_sections.append(
             ArticleSection(
-                section_id=f"{section.section_id}-{index}",
+                section_id=f"{section.section_id}-{next_part - 1}",
                 heading=heading,
                 heading_level=section.heading_level,
                 position=section.position,
