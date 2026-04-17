@@ -72,6 +72,13 @@ class Settings(BaseSettings):
     producer_source_char_limit: int = 30_000
     script_min_words: int = 80
     script_max_words: int = 100
+    # Soft tolerance applied AFTER deterministic word-count stabilization. The
+    # writer is still asked for ``script_min_words..script_max_words``, but we
+    # accept anything in ``[min - tolerance, max + tolerance]`` so small LLM
+    # drifts (e.g. 101-105 words because numeric tokens like "3.1" or "Day 1-4"
+    # tokenize into multiple words) do not push the entire batch into a 3-pass
+    # repair loop that almost always ends in a hard failure.
+    script_word_tolerance: int = 10
     script_min_characters: int = 500
     script_target_min_seconds: float = 25.0
     script_target_max_seconds: float = 30.0

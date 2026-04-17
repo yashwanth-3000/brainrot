@@ -897,12 +897,16 @@ class AgentService:
         seen_primary_fact_clusters: set[str] = set()
         product_name_first_openings = 0
         canonical_title_key = _normalize_script_text(bundle.source_brief.canonical_title)
+        word_tolerance = max(0, getattr(self.settings, "script_word_tolerance", 0))
+        word_min_allowed = max(0, self.settings.script_min_words - word_tolerance)
+        word_max_allowed = self.settings.script_max_words + word_tolerance
         for index, script in enumerate(bundle.scripts, start=1):
             word_count = _count_words(script.narration_text)
-            if not self.settings.script_min_words <= word_count <= self.settings.script_max_words:
+            if not word_min_allowed <= word_count <= word_max_allowed:
                 errors.append(
                     f"script {index} has {word_count} words; required range is "
-                    f"{self.settings.script_min_words}-{self.settings.script_max_words}"
+                    f"{self.settings.script_min_words}-{self.settings.script_max_words} "
+                    f"(±{word_tolerance} tolerance)"
                 )
             char_count = len(script.narration_text)
             if char_count < self.settings.script_min_characters:

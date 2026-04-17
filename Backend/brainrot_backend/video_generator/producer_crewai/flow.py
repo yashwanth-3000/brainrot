@@ -848,9 +848,14 @@ class CrewAIProducerFlow:
             problems: list[str] = []
             narration = " ".join(payload.narration_text.split()).strip()
             word_count = len(TOKEN_RE.findall(narration))
-            if not self.settings.script_min_words <= word_count <= self.settings.script_max_words:
+            tolerance = max(0, getattr(self.settings, "script_word_tolerance", 0))
+            min_allowed = max(0, self.settings.script_min_words - tolerance)
+            max_allowed = self.settings.script_max_words + tolerance
+            if not min_allowed <= word_count <= max_allowed:
                 problems.append(
-                    f"narration word count is {word_count}, required {self.settings.script_min_words}-{self.settings.script_max_words}"
+                    f"narration word count is {word_count}, required "
+                    f"{self.settings.script_min_words}-{self.settings.script_max_words} "
+                    f"(±{tolerance} tolerance)"
                 )
             if len(narration) < self.settings.script_min_characters:
                 problems.append(f"narration characters are below {self.settings.script_min_characters}")
@@ -1019,6 +1024,39 @@ class CrewAIProducerFlow:
             max_words=self.settings.script_max_words,
         )
 
+        # Deterministic safety net for the "opening repeats the hook" / "opening
+        # repeats the title" validator failures. The LLM frequently regenerates
+        # the same lead even after the repair task is run, so we rewrite the
+        # opening locally whenever it collides with the hook or the title. We
+        # deliberately pick a *different* fact than the one the hook uses (and
+        # fall back to the section summary or a cluster heading) because the
+        # anchor fact is often what the hook was built from, so reusing it
+        # here would leave the collision in place.
+        opening = _opening_sentence(narration_text)
+        opening_key = _opening_compare_key(opening)
+        hook_key = _opening_compare_key(hook)
+        title_key = _opening_compare_key(title)
+        if opening_key and (opening_key == hook_key or opening_key == title_key):
+            alt_lead = _pick_alternative_opening(
+                slot=slot,
+                facts=normalized_facts or grounding_facts,
+                section_summary=slot.cluster.section_summary,
+                avoid={hook_key, title_key, opening_key, _opening_compare_key(selected_fact)},
+            )
+            if alt_lead:
+                narration_text = _replace_opening_sentence(narration_text, alt_lead)
+                narration_text = _expand_narration_to_target(
+                    text=narration_text,
+                    facts=normalized_facts or grounding_facts,
+                    section_summary=slot.cluster.section_summary,
+                    min_words=self.settings.script_min_words,
+                    min_characters=self.settings.script_min_characters,
+                )
+                narration_text = _trim_narration_to_max_words(
+                    narration_text,
+                    max_words=self.settings.script_max_words,
+                )
+
         return payload.model_copy(
             update={
                 "title": title,
@@ -1154,6 +1192,60 @@ def _grounded_hook_for_slot(*, slot: CoverageSlotPlan, fact: str) -> str:
 def _opening_for_slot(*, slot: CoverageSlotPlan, fact: str) -> str:
     opening = _sentence_case(_inline_clause_fact(fact)).rstrip(".")
     return f"{opening}."
+
+
+def _opening_compare_key(text: str) -> str:
+    """Normalization used when comparing opening/hook/title to detect
+    duplicates. Strips trailing punctuation so 'foo.' and 'foo' compare equal.
+    """
+
+    return _normalize_text(text).rstrip(".!?,;:").strip()
+
+
+def _pick_alternative_opening(
+    *,
+    slot: CoverageSlotPlan,
+    facts: list[str],
+    section_summary: str,
+    avoid: set[str],
+) -> str | None:
+    """Pick a deterministic opening sentence from *real article content* that
+    is guaranteed different from the hook/title. Returns ``None`` if no
+    grounded alternative exists, in which case the caller must not substitute
+    a template; the validator's tolerance band acts as the final safety net
+    in that rare case.
+
+    Only real cluster facts, the real section summary, and the real cluster
+    headings are considered. No templated or hard-coded phrasing is used.
+    """
+
+    avoid_keys = {_opening_compare_key(value) for value in avoid if value}
+    avoid_keys.discard("")
+    candidates: list[str] = []
+    for fact in facts:
+        cleaned = _clean_fact_candidate(fact)
+        if cleaned:
+            candidates.append(cleaned)
+    if section_summary:
+        cleaned = _clean_fact_candidate(section_summary)
+        if cleaned:
+            candidates.append(cleaned)
+    for heading in slot.cluster.headings:
+        if heading and heading.strip():
+            candidates.append(heading.strip())
+
+    seen_keys: set[str] = set()
+    for candidate in candidates:
+        if not candidate:
+            continue
+        opening = _opening_for_slot(slot=slot, fact=candidate)
+        key = _opening_compare_key(opening)
+        if not key or key in avoid_keys or key in seen_keys:
+            seen_keys.add(key)
+            continue
+        return opening
+
+    return None
 
 
 def _select_best_fact_for_slot(*, slot: CoverageSlotPlan, facts: list[str], product_name: str) -> str:
@@ -1322,13 +1414,59 @@ def _expand_narration_to_target(
 
 
 def _trim_narration_to_max_words(text: str, *, max_words: int) -> str:
+    """Trim narration so it stays at or below ``max_words`` *as the validator counts*.
+
+    The downstream validator counts words via ``TOKEN_RE`` (which splits things
+    like ``"3.1"`` and ``"day-7"`` into multiple tokens). Trimming with plain
+    ``str.split()`` undercounts those constructs, so the validator sees more
+    words than the trimmer thought it produced and we get stuck in a 101-105
+    word repair loop. We trim using the *same* tokenizer the validator uses
+    so the post-trim count is guaranteed to be in-range.
+
+    To avoid clipping mid-sentence we round down to the most recent sentence
+    boundary that still fits inside the budget. If no boundary fits, we trim
+    word-by-word and re-punctuate.
+    """
+
     normalized = " ".join(text.split()).strip()
-    words = normalized.split()
-    if len(words) <= max_words:
+    if not normalized:
         return normalized
-    trimmed = " ".join(words[:max_words]).rstrip(",;:")
-    if trimmed and trimmed[-1] not in ".!?":
-        trimmed = f"{trimmed}."
+    if len(TOKEN_RE.findall(normalized)) <= max_words:
+        return normalized
+
+    # Walk through ``str.split()`` words and accumulate until adding the next
+    # word would push the validator-visible token count over ``max_words``.
+    raw_words = normalized.split()
+    accepted: list[str] = []
+    token_count = 0
+    last_sentence_break_index: int | None = None  # index in ``accepted``
+    for word in raw_words:
+        word_tokens = len(TOKEN_RE.findall(word))
+        if token_count + word_tokens > max_words:
+            break
+        accepted.append(word)
+        token_count += word_tokens
+        if word.endswith((".", "!", "?")):
+            last_sentence_break_index = len(accepted)
+
+    if not accepted:
+        return ""
+
+    # Only round down to a sentence boundary if doing so keeps at least 70% of
+    # the budget. Otherwise the boundary is too early in the text (e.g. only
+    # one period exists in a long block of repeated padding words) and
+    # rounding to it would discard most of the narration.
+    keep_threshold = max(1, int(max_words * 0.7))
+    use_boundary = (
+        last_sentence_break_index is not None
+        and last_sentence_break_index >= keep_threshold
+    )
+    if use_boundary:
+        trimmed = " ".join(accepted[:last_sentence_break_index]).strip()
+    else:
+        trimmed = " ".join(accepted).rstrip(",;:")
+        if trimmed and trimmed[-1] not in ".!?":
+            trimmed = f"{trimmed}."
     return trimmed
 
 
