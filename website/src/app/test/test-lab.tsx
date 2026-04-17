@@ -2083,6 +2083,24 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
     };
   }
   if (event.type === "error") {
+    const code = stringValue(payload.code);
+    if (code === "SOURCE_UNAVAILABLE") {
+      const url = stringValue(payload.url);
+      const reason = stringValue(payload.reason);
+      const detailText = [
+        url ? `We couldn't scrape ${url}.` : "We couldn't scrape this URL.",
+        "Please try again with a different URL.",
+        reason ? `(reason: ${reason})` : null,
+      ].filter(Boolean).join(" ");
+      return {
+        ...base,
+        tone: "danger" as const,
+        iconKey: "danger",
+        providerLabel: "Firecrawl",
+        title: "This URL cannot be scraped",
+        detail: withEventMeta(detailText, event),
+      };
+    }
     return {
       ...base,
       tone: "danger" as const,

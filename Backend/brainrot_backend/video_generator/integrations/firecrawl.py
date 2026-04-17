@@ -42,7 +42,168 @@ EXCLUDED_HINTS = (
     "/signup",
 )
 
+# Minimum number of characters of usable markdown we expect from a successful
+# scrape. Anything below this is treated as a soft failure (cookie banners,
+# bot challenge pages, login walls, etc.) so the user can be told to try a
+# different URL instead of getting silent producer errors downstream.
+MIN_USABLE_MARKDOWN_CHARS = 200
+
+# Internal Firecrawl 5xx error codes that mean the page itself is unreachable
+# or actively blocking scraping. See https://docs.firecrawl.dev/api-reference/introduction
+UNRECOVERABLE_FIRECRAWL_CODES = {
+    "SCRAPE_ALL_ENGINES_FAILED",
+    "SCRAPE_SITE_ERROR",
+    "SCRAPE_DNS_RESOLUTION_ERROR",
+    "SCRAPE_SSL_ERROR",
+    "SCRAPE_PDF_PREFETCH_FAILED",
+    "SCRAPE_PDF_ANTIBOT_ERROR",
+    "SCRAPE_UNSUPPORTED_FILE_ERROR",
+}
+
+# HTTP status codes from Firecrawl that we should surface as a clean
+# "this URL cannot be scraped" error instead of bubbling up the raw HTTP
+# error. We deliberately exclude 401/402/429 because those are caused by
+# our Firecrawl account, not by the user's URL.
+URL_LEVEL_HTTP_STATUS_CODES = {400, 403, 404, 410, 451}
+
 type ProgressCallback = Callable[[dict[str, object]], Awaitable[None]]
+
+
+class SourceUnavailableError(RuntimeError):
+    """Raised when Firecrawl cannot retrieve usable content for a URL.
+
+    The orchestrator and API surface translate this into a friendly
+    "this URL cannot be scraped, please try another one" message instead of
+    the raw underlying transport / HTTP error.
+    """
+
+    def __init__(
+        self,
+        *,
+        url: str | None,
+        reason: str,
+        code: str = "SOURCE_UNAVAILABLE",
+        status_code: int | None = None,
+        firecrawl_code: str | None = None,
+    ) -> None:
+        clean_url = (url or "").strip()
+        if clean_url:
+            message = (
+                f"We couldn't scrape content from {clean_url} ({reason}). "
+                "Please try again with a different URL."
+            )
+        else:
+            message = (
+                f"We couldn't scrape content from this source ({reason}). "
+                "Please try again with a different URL."
+            )
+        super().__init__(message)
+        self.url = clean_url or None
+        self.reason = reason
+        self.code = code
+        self.status_code = status_code
+        self.firecrawl_code = firecrawl_code
+
+    def to_event_payload(self) -> dict[str, object]:
+        payload: dict[str, object] = {
+            "message": str(self),
+            "code": self.code,
+            "reason": self.reason,
+            "user_message": (
+                "We couldn't scrape this URL. Please try again with a different URL."
+            ),
+        }
+        if self.url:
+            payload["url"] = self.url
+        if self.status_code is not None:
+            payload["status_code"] = self.status_code
+        if self.firecrawl_code:
+            payload["firecrawl_code"] = self.firecrawl_code
+        return payload
+
+
+def _looks_like_anti_bot_or_login(markdown: str) -> bool:
+    """Return True when the markdown is a stub challenge / login / cookie wall."""
+
+    snippet = markdown.strip().lower()
+    if not snippet:
+        return True
+    sentinels = (
+        "just a moment",
+        "checking your browser",
+        "enable javascript",
+        "please enable javascript",
+        "verify you are human",
+        "captcha",
+        "access denied",
+        "are you a robot",
+        "cloudflare",
+        "log in to continue",
+        "sign in to continue",
+        "you must be logged in",
+    )
+    if any(sentinel in snippet for sentinel in sentinels):
+        return True
+    return False
+
+
+def _extract_firecrawl_error_code(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    for key in ("errorCode", "error_code", "code"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            return value
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return _extract_firecrawl_error_code(error)
+    if isinstance(error, str) and error.upper() == error and "_" in error:
+        return error
+    return None
+
+
+def _http_error_to_source_unavailable(exc: httpx.HTTPStatusError, *, url: str) -> SourceUnavailableError | None:
+    status_code = exc.response.status_code
+    firecrawl_code: str | None = None
+    try:
+        body = exc.response.json()
+    except Exception:  # pragma: no cover - body may be empty / non-json
+        body = None
+    firecrawl_code = _extract_firecrawl_error_code(body)
+
+    if firecrawl_code in UNRECOVERABLE_FIRECRAWL_CODES:
+        reason_map = {
+            "SCRAPE_ALL_ENGINES_FAILED": "the site blocked every available scraping engine",
+            "SCRAPE_SITE_ERROR": "the site returned an unrecoverable error",
+            "SCRAPE_DNS_RESOLUTION_ERROR": "the domain could not be resolved",
+            "SCRAPE_SSL_ERROR": "the site has an invalid SSL certificate",
+            "SCRAPE_PDF_PREFETCH_FAILED": "the PDF could not be downloaded",
+            "SCRAPE_PDF_ANTIBOT_ERROR": "the PDF host is blocking automated downloads",
+            "SCRAPE_UNSUPPORTED_FILE_ERROR": "the file type is not supported",
+        }
+        return SourceUnavailableError(
+            url=url,
+            reason=reason_map.get(firecrawl_code, "the site is unreachable"),
+            status_code=status_code,
+            firecrawl_code=firecrawl_code,
+        )
+
+    if status_code in URL_LEVEL_HTTP_STATUS_CODES:
+        reason_map = {
+            400: "the URL was rejected as invalid by the scraper",
+            403: "the site refused our scraping request (HTTP 403)",
+            404: "the page could not be found (HTTP 404)",
+            410: "the page is gone (HTTP 410)",
+            451: "the page is unavailable for legal reasons (HTTP 451)",
+        }
+        return SourceUnavailableError(
+            url=url,
+            reason=reason_map.get(status_code, f"HTTP {status_code}"),
+            status_code=status_code,
+            firecrawl_code=firecrawl_code,
+        )
+
+    return None
 
 
 class FirecrawlClient:
@@ -126,12 +287,28 @@ class FirecrawlClient:
                 source_kind=source_kind.value,
                 url=url,
             )
-        except Exception as exc:
+        except SourceUnavailableError:
+            raise
+        except httpx.HTTPStatusError as exc:
+            unavailable = _http_error_to_source_unavailable(exc, url=url)
+            if unavailable is not None:
+                await self._report_progress(
+                    progress_callback,
+                    stage="ingest",
+                    source="firecrawl",
+                    message=str(unavailable),
+                    elapsed_seconds=self._elapsed(started_at),
+                    source_kind=source_kind.value,
+                    url=url,
+                    error_code=unavailable.code,
+                    user_message=unavailable.to_event_payload().get("user_message"),
+                )
+                raise unavailable from exc
             await self._report_progress(
                 progress_callback,
                 stage="ingest",
                 source="firecrawl",
-                message="Primary scrape timed out or failed. Retrying with markdown-only scrape.",
+                message="Primary scrape failed. Retrying with markdown-only scrape.",
                 elapsed_seconds=self._elapsed(started_at),
                 source_kind=source_kind.value,
                 url=url,
@@ -145,6 +322,31 @@ class FirecrawlClient:
                 source_kind=source_kind.value,
                 url=url,
             )
+        except Exception as exc:
+            await self._report_progress(
+                progress_callback,
+                stage="ingest",
+                source="firecrawl",
+                message="Primary scrape timed out or failed. Retrying with markdown-only scrape.",
+                elapsed_seconds=self._elapsed(started_at),
+                source_kind=source_kind.value,
+                url=url,
+                error=str(exc),
+            )
+            try:
+                data = await self._await_with_progress(
+                    self._post("v2/scrape", fallback_payload),
+                    progress_callback=progress_callback,
+                    started_at=started_at,
+                    message="Firecrawl scrape request is still running.",
+                    source_kind=source_kind.value,
+                    url=url,
+                )
+            except httpx.HTTPStatusError as fallback_exc:
+                unavailable = _http_error_to_source_unavailable(fallback_exc, url=url)
+                if unavailable is not None:
+                    raise unavailable from fallback_exc
+                raise
         payload = self._unwrap_data(data)
         markdown = payload.get("markdown") or payload.get("content") or ""
         metadata = dict(payload.get("metadata") or {})
@@ -152,6 +354,12 @@ class FirecrawlClient:
             metadata.setdefault("source_summary", payload["summary"])
         normalized_source_url = metadata.get("sourceURL") or metadata.get("url") or url
         title = metadata.get("title") or payload.get("title") or url
+
+        self._guard_scrape_quality(
+            url=url,
+            markdown=markdown,
+            metadata=metadata,
+        )
         await self._report_progress(
             progress_callback,
             stage="ingest",
@@ -193,6 +401,27 @@ class FirecrawlClient:
                 started_at=started_at,
                 message="Firecrawl site mapping request is still running.",
                 url=url,
+            )
+        except SourceUnavailableError:
+            raise
+        except httpx.HTTPStatusError as map_exc:
+            unavailable = _http_error_to_source_unavailable(map_exc, url=url)
+            if unavailable is not None:
+                raise unavailable from map_exc
+            await self._report_progress(
+                progress_callback,
+                stage="ingest",
+                source="firecrawl",
+                message="Site mapping failed. Falling back to a direct scrape of the source URL.",
+                elapsed_seconds=self._elapsed(started_at),
+                url=url,
+                error=str(map_exc),
+            )
+            return await self._scrape_url(
+                url,
+                SourceKind.WEBSITE,
+                progress_callback=progress_callback,
+                started_at=started_at,
             )
         except Exception as exc:
             await self._report_progress(
@@ -298,7 +527,19 @@ class FirecrawlClient:
                 markdown_chunks.append(scraped.markdown)
 
         if not markdown_chunks:
-            raise RuntimeError("Firecrawl did not return content for the requested website.")
+            raise SourceUnavailableError(
+                url=url,
+                reason="the site mapping returned no readable pages",
+            )
+
+        combined_markdown = "\n\n".join(markdown_chunks).strip()
+        if len(combined_markdown) < MIN_USABLE_MARKDOWN_CHARS:
+            raise SourceUnavailableError(
+                url=url,
+                reason=(
+                    f"only {len(combined_markdown)} characters of usable text were returned"
+                ),
+            )
 
         return IngestedSource(
             source_kind=SourceKind.WEBSITE,
@@ -435,6 +676,44 @@ class FirecrawlClient:
     @staticmethod
     def _unwrap_data(payload: dict):
         return payload.get("data", payload)
+
+    @staticmethod
+    def _guard_scrape_quality(*, url: str, markdown: str, metadata: dict[str, object]) -> None:
+        """Raise SourceUnavailableError if the scrape returned nothing usable.
+
+        Firecrawl can return HTTP 200 with empty / placeholder markdown when a
+        site fully blocks the scraper (cookie walls, bot challenges, login
+        gates). We treat that as a soft failure so the user gets a clear
+        "try a different URL" message instead of cryptic downstream errors.
+        """
+
+        status_code = metadata.get("statusCode") or metadata.get("status_code")
+        if isinstance(status_code, int) and status_code >= 400:
+            reason = f"the page returned HTTP {status_code}"
+            raise SourceUnavailableError(
+                url=url,
+                reason=reason,
+                status_code=status_code,
+            )
+
+        cleaned = (markdown or "").strip()
+        if not cleaned:
+            raise SourceUnavailableError(
+                url=url,
+                reason="the page returned no readable content",
+            )
+        if len(cleaned) < MIN_USABLE_MARKDOWN_CHARS:
+            raise SourceUnavailableError(
+                url=url,
+                reason=(
+                    f"only {len(cleaned)} characters of usable text were returned"
+                ),
+            )
+        if _looks_like_anti_bot_or_login(cleaned):
+            raise SourceUnavailableError(
+                url=url,
+                reason="the site is blocking automated access (bot challenge or login wall)",
+            )
 
     @staticmethod
     def _elapsed(started_at: float | None) -> float | None:

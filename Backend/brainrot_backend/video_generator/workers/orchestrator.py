@@ -10,7 +10,10 @@ from pathlib import Path
 from contextlib import suppress
 
 from brainrot_backend.config import Settings
-from brainrot_backend.video_generator.integrations.firecrawl import FirecrawlClient
+from brainrot_backend.video_generator.integrations.firecrawl import (
+    FirecrawlClient,
+    SourceUnavailableError,
+)
 from brainrot_backend.core.models.domain import AssetRecord, BatchItemRecord, BatchRecord, GeneratedBundle, ScriptDraft
 from brainrot_backend.core.models.enums import AssetKind, BatchEventType, BatchItemStatus, BatchStatus
 from brainrot_backend.video_generator.render.assets import AssetSelector
@@ -418,6 +421,23 @@ class BatchOrchestrator:
             if render_tasks:
                 await asyncio.gather(*render_tasks)
             await self._finalize_batch(batch_id)
+        except SourceUnavailableError as exc:
+            logger.warning(
+                "Batch %s aborted: source unavailable for %s (%s)",
+                batch_id,
+                exc.url or "<no url>",
+                exc.reason,
+            )
+            await self.repository.update_batch(
+                batch_id,
+                status=BatchStatus.FAILED,
+                error=str(exc),
+            )
+            await self.events.publish(
+                batch_id,
+                BatchEventType.ERROR,
+                {**exc.to_event_payload(), "stage": "ingest"},
+            )
         except Exception as exc:
             logger.error("Batch %s failed: %s", batch_id, exc, exc_info=True)
             await self.repository.update_batch(

@@ -306,25 +306,44 @@ export function LiveBatchMessage({ seed }: { seed: LiveBatchSeed }) {
   const failedCount = sortedItems.filter(item => item.status === "failed").length;
   const requestedCount = batch?.requested_count ?? seed.initialEnvelope?.batch.requested_count ?? 0;
 
-  const traceSummary = localError
+  const sourceUnavailableEvent = events.find(
+    event => event.type === "error" && stringValue(event.payload.code) === "SOURCE_UNAVAILABLE",
+  );
+
+  const traceSummary = sourceUnavailableEvent
     ? {
-        title: "The live generation run failed",
-        detail: localError,
+        title: "This URL cannot be scraped",
+        detail:
+          (stringValue(sourceUnavailableEvent.payload.user_message) ??
+            stringValue(sourceUnavailableEvent.payload.message)) +
+          (stringValue(sourceUnavailableEvent.payload.url)
+            ? ` URL: ${stringValue(sourceUnavailableEvent.payload.url)}.`
+            : "") +
+          " Try again with a different URL.",
         liveLabel: lastSyncedAt ? `Last sync ${formatClock(lastSyncedAt)}` : null,
         tone: "danger" as const,
         iconKey: "danger" as const,
-        providerLabel: "Backend",
+        providerLabel: "Firecrawl",
       }
-    : !seed.batchId
+    : localError
       ? {
-          title: "Preparing the live batch",
-          detail: "The chat page is bootstrapping agents and creating a backend batch for this request.",
-          liveLabel: `Started ${formatDurationLabel(Math.max(0, Math.round((nowTick - new Date(seed.createdAt).getTime()) / 1000)))} ago`,
-        tone: "accent" as const,
-        iconKey: "backend" as const,
-        providerLabel: "Backend",
-      }
-      : buildActivitySummary(activeOperations, latestLogEvent, batch, nowTick, isBatchSettled, uploadedCount, requestedCount);
+          title: "The live generation run failed",
+          detail: localError,
+          liveLabel: lastSyncedAt ? `Last sync ${formatClock(lastSyncedAt)}` : null,
+          tone: "danger" as const,
+          iconKey: "danger" as const,
+          providerLabel: "Backend",
+        }
+      : !seed.batchId
+        ? {
+            title: "Preparing the live batch",
+            detail: "The chat page is bootstrapping agents and creating a backend batch for this request.",
+            liveLabel: `Started ${formatDurationLabel(Math.max(0, Math.round((nowTick - new Date(seed.createdAt).getTime()) / 1000)))} ago`,
+            tone: "accent" as const,
+            iconKey: "backend" as const,
+            providerLabel: "Backend",
+          }
+        : buildActivitySummary(activeOperations, latestLogEvent, batch, nowTick, isBatchSettled, uploadedCount, requestedCount);
 
   const traceThinkingDuration =
     events.length > 0
@@ -1030,6 +1049,24 @@ function toLogEntry(event: BatchEventRecord): LogEntry {
     };
   }
   if (event.type === "error") {
+    const code = stringValue(payload.code);
+    if (code === "SOURCE_UNAVAILABLE") {
+      const url = stringValue(payload.url);
+      const reason = stringValue(payload.reason);
+      const detailParts = [
+        url ? `We couldn't scrape ${url}.` : "We couldn't scrape this URL.",
+        "Please try again with a different URL.",
+        reason ? `(reason: ${reason})` : null,
+      ].filter(Boolean) as string[];
+      return {
+        ...base,
+        tone: "danger",
+        iconKey: "danger",
+        providerLabel: "Firecrawl",
+        title: "This URL cannot be scraped",
+        detail: withEventMeta(detailParts.join(" "), event),
+      };
+    }
     return { ...base, tone: "danger", iconKey: "danger", providerLabel: "Backend", title: "Backend error", detail: withEventMeta(stringValue(payload.message) ?? "Backend error", event) };
   }
 
